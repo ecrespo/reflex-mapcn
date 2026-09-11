@@ -120,7 +120,8 @@ class MapcnComponent(NoSSRComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class Map(MapcnComponent):
@@ -260,7 +261,8 @@ class Map(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class MapMarker(MapcnComponent):
@@ -383,7 +385,8 @@ class MapMarker(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class MarkerContent(MapcnComponent):
@@ -448,7 +451,8 @@ class MarkerContent(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class MarkerPopup(MapcnComponent):
@@ -531,7 +535,8 @@ class MarkerPopup(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class MarkerTooltip(MapcnComponent):
@@ -606,7 +611,8 @@ class MarkerTooltip(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class MarkerLabel(MapcnComponent):
@@ -675,7 +681,8 @@ class MarkerLabel(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class MapPopup(MapcnComponent):
@@ -764,7 +771,8 @@ class MapPopup(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class MapControls(MapcnComponent):
@@ -843,7 +851,8 @@ class MapControls(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class MapRoute(MapcnComponent):
@@ -934,7 +943,8 @@ class MapRoute(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class RouteProgress(MapcnComponent):
@@ -1007,7 +1017,8 @@ class RouteProgress(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class RouteMarker(MapMarker):
@@ -1132,7 +1143,8 @@ class RouteMarker(MapMarker):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class MapArc(MapcnComponent):
@@ -1215,7 +1227,8 @@ class MapArc(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class MapGeoJSON(MapcnComponent):
@@ -1296,7 +1309,8 @@ class MapGeoJSON(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class MapClusterLayer(MapcnComponent):
@@ -1377,7 +1391,8 @@ class MapClusterLayer(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 class MapCamera(MapcnComponent):
@@ -1444,7 +1459,8 @@ class MapCamera(MapcnComponent):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 def camera_command(
@@ -1619,7 +1635,8 @@ class MapcnNamespace(rx.ComponentNamespace):
             **props: The props of the component.
 
         Returns:
-            The component."""
+            The component.
+        """
         ...
 
 mapcn = MapcnNamespace()
