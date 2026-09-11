@@ -216,3 +216,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Reflex
+.web/
+.states/
+assets/external/
+mapcn_demo/.web/
+mapcn_demo/.states/
+mapcn_demo/assets/external/
+reflex.db
+*.db
+.idea/

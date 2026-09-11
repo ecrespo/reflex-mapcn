@@ -1,0 +1,348 @@
+/*
+ * mapcn for Reflex — component styles.
+ *
+ * The original mapcn component is styled with Tailwind + shadcn tokens. This
+ * stylesheet reproduces the same look with plain CSS, themed through a small
+ * set of `--mapcn-*` custom properties that default to the Radix Themes
+ * variables Reflex ships with (and sensible hex fallbacks when they are absent).
+ *
+ * Override any of the variables on `.mapcn-map` (or a parent) to re-theme.
+ */
+
+.mapcn-map {
+  --mapcn-bg: var(--color-panel-solid, #ffffff);
+  --mapcn-bg-translucent: var(--color-panel-translucent, rgba(255, 255, 255, 0.85));
+  --mapcn-fg: var(--gray-12, #0a0a0a);
+  --mapcn-muted-fg: var(--gray-11, #737373);
+  --mapcn-border: var(--gray-6, #e5e5e5);
+  --mapcn-accent: var(--accent-9, #3b82f6);
+  --mapcn-hover: var(--gray-3, #f5f5f5);
+  --mapcn-ring: var(--accent-8, #60a5fa);
+  --mapcn-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --mapcn-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --mapcn-radius: var(--radius-3, 6px);
+  --mapcn-loader-bg: rgba(255, 255, 255, 0.5);
+
+  position: relative;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  color: var(--mapcn-fg);
+  font-family: var(--default-font-family, inherit);
+}
+
+.dark .mapcn-map,
+[data-theme="dark"] .mapcn-map,
+.mapcn-map[data-mapcn-theme="dark"] {
+  --mapcn-bg: var(--color-panel-solid, #171717);
+  --mapcn-bg-translucent: var(--color-panel-translucent, rgba(23, 23, 23, 0.85));
+  --mapcn-fg: var(--gray-12, #fafafa);
+  --mapcn-muted-fg: var(--gray-11, #a3a3a3);
+  --mapcn-border: var(--gray-6, #333333);
+  --mapcn-hover: var(--gray-3, #262626);
+  --mapcn-loader-bg: rgba(0, 0, 0, 0.4);
+}
+
+/* ------------------------------------------------------------------ */
+/* MapLibre overrides (mirrors the registry `css` block of mapcn)      */
+/* ------------------------------------------------------------------ */
+
+.mapcn-map .maplibregl-popup-content {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+.mapcn-map .maplibregl-popup-tip {
+  display: none !important;
+}
+
+.mapcn-map .maplibregl-ctrl-attrib {
+  background: var(--mapcn-bg) !important;
+  color: var(--mapcn-muted-fg) !important;
+  border: 1px solid var(--mapcn-border) !important;
+  border-radius: var(--mapcn-radius) !important;
+  box-shadow: var(--mapcn-shadow) !important;
+  font-size: 11px;
+}
+
+.mapcn-map .maplibregl-ctrl-attrib a {
+  color: var(--mapcn-muted-fg) !important;
+}
+
+.mapcn-map .maplibregl-ctrl-attrib a:hover {
+  color: var(--mapcn-fg) !important;
+}
+
+.mapcn-map .maplibregl-ctrl-attrib-button {
+  background-color: transparent !important;
+}
+
+.dark .mapcn-map .maplibregl-ctrl-attrib-button,
+[data-theme="dark"] .mapcn-map .maplibregl-ctrl-attrib-button,
+.mapcn-map[data-mapcn-theme="dark"] .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
+
+.mapcn-map .maplibregl-canvas:focus {
+  outline: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Loader                                                               */
+/* ------------------------------------------------------------------ */
+
+.mapcn-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mapcn-loader-bg);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.mapcn-loader-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.mapcn-loader-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--mapcn-muted-fg);
+  opacity: 0.6;
+  animation: mapcn-pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.mapcn-loader-dot:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.mapcn-loader-dot:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+@keyframes mapcn-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.2;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Markers                                                              */
+/* ------------------------------------------------------------------ */
+
+.mapcn-marker-content {
+  position: relative;
+  cursor: pointer;
+}
+
+.mapcn-marker-default {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  border: 2px solid #ffffff;
+  background: var(--mapcn-accent);
+  box-shadow: var(--mapcn-shadow-md);
+}
+
+.mapcn-marker-label {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: var(--mapcn-fg);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.mapcn-marker-label-top {
+  bottom: 100%;
+  margin-bottom: 4px;
+}
+
+.mapcn-marker-label-bottom {
+  top: 100%;
+  margin-top: 4px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Popups & tooltips                                                    */
+/* ------------------------------------------------------------------ */
+
+.mapcn-popup {
+  position: relative;
+  max-width: 248px;
+  border-radius: var(--mapcn-radius);
+  border: 1px solid var(--mapcn-border);
+  background: var(--mapcn-bg);
+  color: var(--mapcn-fg);
+  padding: 12px;
+  box-shadow: var(--mapcn-shadow-md);
+  font-size: 14px;
+  line-height: 1.45;
+  animation: mapcn-in 200ms ease-out;
+}
+
+.mapcn-popup-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 10;
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--mapcn-fg);
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 150ms;
+}
+
+.mapcn-popup-close:hover {
+  background: var(--mapcn-hover);
+}
+
+.mapcn-popup-close:focus {
+  outline: none;
+}
+
+.mapcn-popup-close:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--mapcn-ring);
+}
+
+.mapcn-tooltip {
+  pointer-events: none;
+  border-radius: var(--mapcn-radius);
+  background: var(--mapcn-fg);
+  color: var(--mapcn-bg);
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  text-wrap: balance;
+  box-shadow: var(--mapcn-shadow-md);
+  animation: mapcn-in 200ms ease-out;
+}
+
+@keyframes mapcn-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Controls                                                             */
+/* ------------------------------------------------------------------ */
+
+.mapcn-controls {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mapcn-controls-top-left {
+  top: 8px;
+  left: 8px;
+}
+
+.mapcn-controls-top-right {
+  top: 8px;
+  right: 8px;
+}
+
+.mapcn-controls-bottom-left {
+  bottom: 8px;
+  left: 8px;
+}
+
+.mapcn-controls-bottom-right {
+  bottom: 40px;
+  right: 8px;
+}
+
+.mapcn-control-group {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--mapcn-radius);
+  border: 1px solid var(--mapcn-border);
+  background: var(--mapcn-bg);
+  box-shadow: var(--mapcn-shadow);
+}
+
+.mapcn-control-button {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--mapcn-fg);
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 150ms;
+}
+
+.mapcn-control-group > .mapcn-control-button:not(:last-child) {
+  border-bottom: 1px solid var(--mapcn-border);
+}
+
+.mapcn-control-button:hover {
+  background: var(--mapcn-hover);
+}
+
+.mapcn-control-button:focus {
+  outline: none;
+}
+
+.mapcn-control-button:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--mapcn-ring);
+}
+
+.mapcn-control-button:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.mapcn-compass-south {
+  fill: var(--mapcn-muted-fg);
+  opacity: 0.6;
+}
+
+.mapcn-compass-south-light {
+  fill: var(--mapcn-muted-fg);
+  opacity: 0.3;
+}
+
+.mapcn-spin {
+  animation: mapcn-spin 1s linear infinite;
+}
+
+@keyframes mapcn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
