@@ -68,9 +68,9 @@ jobs:
       - uses: astral-sh/setup-uv@v10.1.0
         with:
           enable-cache: true
-          # Must match .python-version: Python 3.13 dedents docstrings at compile
-          # time, so the generated stubs differ between interpreters.
-          python-version-file: .python-version
+      # uv reads .python-version itself, which keeps the pin in one place.
+      # It matters here: Python 3.13 dedents docstrings at compile time, so the
+      # generated stubs differ between interpreters.
       - run: uv sync --locked --extra dev
 
       - name: Validate packaging metadata
