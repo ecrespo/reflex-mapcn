@@ -6,6 +6,8 @@ React module itself is exercised by the demo app in a browser.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 import reflex as rx
 import reflex_mapcn as mapcn
@@ -285,3 +287,74 @@ def test_REQ_LAY_007_a_state_var_source_is_not_validated_eagerly():
     # A Var resolves in the browser; validating it here would reject valid code.
     component = mapcn.map_layer(source=_State.viewport, layer={"type": "line"})
     assert isinstance(component, mapcn.MapLayer)
+
+
+def test_REQ_HEA_003_weight_property_becomes_an_interpolated_weight():
+    layer = mapcn.map_heatmap_layer(
+        data={"type": "FeatureCollection", "features": []},
+        weight_property="mag",
+        weight_range=[4.0, 8.0],
+    )
+    assert json.loads(str(layer.weight)) == [
+        "interpolate",
+        ["linear"],
+        ["get", "mag"],
+        4.0,
+        0,
+        8.0,
+        1,
+    ]
+
+
+def test_REQ_HEA_003_an_explicit_weight_wins_over_the_property():
+    layer = mapcn.map_heatmap_layer(
+        data="/quakes.geojson",
+        weight=0.5,
+        weight_property="mag",
+        weight_range=[4.0, 8.0],
+    )
+    assert _prop(layer, "weight") == "0.5"
+
+
+def test_REQ_HEA_003_a_weight_property_without_a_range_is_rejected():
+    with pytest.raises(ValueError, match="weight_range"):
+        mapcn.map_heatmap_layer(data="/quakes.geojson", weight_property="mag")
+
+
+def test_REQ_HEA_004_max_zoom_fade_becomes_a_fading_opacity():
+    layer = mapcn.map_heatmap_layer(data="/quakes.geojson", max_zoom_fade=8)
+    assert json.loads(str(layer.opacity)) == [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        7,
+        1,
+        8,
+        0,
+    ]
+
+
+def test_REQ_HEA_004_an_explicit_opacity_wins_over_the_fade():
+    layer = mapcn.map_heatmap_layer(
+        data="/quakes.geojson", opacity=0.4, max_zoom_fade=8
+    )
+    assert _prop(layer, "opacity") == "0.4"
+
+
+def test_REQ_HEA_001_a_heatmap_without_data_is_rejected():
+    with pytest.raises(ValueError, match="data is required"):
+        mapcn.map_heatmap_layer(radius=20)
+
+
+def test_REQ_HEA_002_the_python_only_props_are_not_forwarded():
+    rendered = _render(
+        mapcn.map_heatmap_layer(
+            data="/quakes.geojson",
+            weight_property="mag",
+            weight_range=[4.0, 8.0],
+            max_zoom_fade=8,
+        )
+    )
+    assert "MapcnHeatmapLayer" in rendered
+    assert "weightProperty" not in rendered
+    assert "maxZoomFade" not in rendered

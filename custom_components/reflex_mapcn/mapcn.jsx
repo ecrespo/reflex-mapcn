@@ -2662,6 +2662,106 @@ function Layer({
 }
 
 // ---------------------------------------------------------------------------
+// Heatmap layer (Reflex extra)
+// ---------------------------------------------------------------------------
+
+// Defaults chosen so a heatmap is readable with nothing but `data`: both the
+// spread and the strength of a point grow as the map is zoomed in.
+const HEATMAP_DEFAULT_INTENSITY = ["interpolate", ["linear"], ["zoom"], 0, 1, 9, 3];
+const HEATMAP_DEFAULT_RADIUS = ["interpolate", ["linear"], ["zoom"], 0, 2, 9, 20];
+const HEATMAP_DEFAULT_COLOR = [
+  "interpolate",
+  ["linear"],
+  ["heatmap-density"],
+  0,
+  "rgba(59,130,246,0)",
+  0.2,
+  "rgb(59,130,246)",
+  0.4,
+  "rgb(34,197,94)",
+  0.6,
+  "rgb(250,204,21)",
+  0.8,
+  "rgb(249,115,22)",
+  1,
+  "rgb(239,68,68)",
+];
+
+// A heatmap is not interactive in MapLibre: it renders density, not features.
+const HEATMAP_HOT_KEYS = ["data", "paint", "layout", "zoomRange", "beforeId"];
+
+/** Point density as a heatmap. Feed it a point FeatureCollection or a url. */
+function HeatmapLayer({
+  id: propId,
+  data,
+  weight = 1,
+  intensity = HEATMAP_DEFAULT_INTENSITY,
+  radius = HEATMAP_DEFAULT_RADIUS,
+  color = HEATMAP_DEFAULT_COLOR,
+  opacity = 0.8,
+  visible = true,
+  beforeId,
+  minZoom,
+  maxZoom,
+}) {
+  const autoId = useId();
+  const id = propId ?? autoId;
+
+  const stableData = useStableValue(data);
+  const stableWeight = useStableValue(weight);
+  const stableIntensity = useStableValue(intensity);
+  const stableRadius = useStableValue(radius);
+  const stableColor = useStableValue(color);
+  const stableOpacity = useStableValue(opacity);
+
+  const source = useMemo(
+    () => ({ type: "geojson", data: stableData }),
+    [stableData],
+  );
+
+  const layers = useMemo(
+    () => [
+      {
+        id: `heatmap-layer-${id}`,
+        type: "heatmap",
+        paint: {
+          "heatmap-weight": stableWeight,
+          "heatmap-intensity": stableIntensity,
+          "heatmap-radius": stableRadius,
+          "heatmap-color": stableColor,
+          "heatmap-opacity": stableOpacity,
+        },
+        layout: { visibility: visible ? "visible" : "none" },
+        ...(minZoom !== undefined ? { minzoom: minZoom } : {}),
+        ...(maxZoom !== undefined ? { maxzoom: maxZoom } : {}),
+      },
+    ],
+    [
+      id,
+      stableWeight,
+      stableIntensity,
+      stableRadius,
+      stableColor,
+      stableOpacity,
+      visible,
+      minZoom,
+      maxZoom,
+    ],
+  );
+
+  useMapLayer({
+    id,
+    sourceId: `heatmap-source-${id}`,
+    source,
+    layers,
+    beforeId,
+    hotKeys: HEATMAP_HOT_KEYS,
+  });
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Reflex helpers
 // ---------------------------------------------------------------------------
 
@@ -2701,6 +2801,7 @@ export {
   useMapLayer,
   RasterLayer,
   Layer,
+  HeatmapLayer,
   MapMarker,
   MarkerContent,
   MarkerPopup,

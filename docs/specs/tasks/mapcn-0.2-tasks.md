@@ -69,7 +69,7 @@
 - **Depende de:** T-003
 - **Done:** test Python `test_REQ_LAY_007_raises_on_missing_type`; JSX: fuente por id existente añade solo capa; `fill-extrusion` sobre `source-layer` compila.
 
-### T-009 · `map_heatmap_layer`
+### T-009 · `map_heatmap_layer` — `[x] 2026-09-11`
 - **Qué:** `HeatmapLayer` JSX (defaults de intensity/radius/color) y `MapHeatmapLayer` con `weight_property`+`weight_range` ⇒ expresión, `max_zoom_fade` ⇒ opacidad interpolada.
 - **REQ:** REQ-HEA-001..006
 - **Depende de:** T-008
@@ -225,6 +225,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-11 | T-009 | OK | TDD: 7 tests de pytest (las dos expresiones generadas, precedencia de la prop explícita, validación) y 5 en Chromium (defaults, mapeo de pintura, caliente, estilo y limpieza). Un test JSX falló por un índice mal contado en la rampa de color y se corrigió el test, no el componente. Anotado un conflicto de spec para T-017: REQ-SIS-008 pide un mapa de calor filtrado, pero el API Spec no da prop `filter` al heatmap y DD-006 prohíbe reenviar los datos; se resolverá con un Delta. 55 tests Python y 35 JSX en verde. |
 | 2026-09-11 | T-008 | OK | TDD: 6 tests de pytest (validación temprana y props) y 5 en Chromium (fuente por diccionario, fuente del estilo por id que solo añade la capa y no se borra al desmontar, fusión de pintura de hover, visibilidad, id de fuente inexistente). Se aplica de paso el hallazgo A-09: `LayerFeatureEvent` se exporta como alias de `MapGeoJSONEvent`. 48 tests Python y 30 JSX en verde. |
 | 2026-09-11 | T-007 | OK | TDD: 8 tests con el cliente HTTP simulado antes del código (éxito, timeout, JSON inválido, estado 503, payload sin radar, plantilla de teselas y sus opciones). `helpers.py` importa `httpx` directamente, así que se declara como dependencia explícita en `pyproject.toml`; ya venía con reflex. 42 tests Python y 25 JSX en verde. |
 | 2026-09-11 | T-006 | OK | TDD en dos frentes: 9 tests de pytest y 8 en Chromium, escritos antes del componente. Decisión de implementación: el rango de zoom sale de la clave de reconstrucción del hook (`sourceIdentity`), porque REQ-RAS-002 exige aplicarlo con `setLayerZoomRange` sin recrear la fuente; la fuente conserva su `maxzoom` nativo para que el sobre-zoom siga funcionando. 34 tests Python y 25 JSX en verde. |

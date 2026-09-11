@@ -38,6 +38,7 @@ import reflex as rx
 from reflex.components.component import NoSSRComponent
 from reflex.event import passthrough_event_spec
 
+from .helpers import interpolate, zoom_interpolate
 from .presets import RASTER_PRESETS
 
 # ---------------------------------------------------------------------------
@@ -695,6 +696,68 @@ class MapLayer(MapcnComponent):
         return super().create(*children, **props)
 
 
+class MapHeatmapLayer(MapcnComponent):
+    """Point density as a heatmap (Reflex extra).
+
+    Feed it a point ``FeatureCollection`` or a url. The defaults are readable
+    on their own; ``weight_property`` and ``max_zoom_fade`` cover the two
+    things almost every heatmap needs::
+
+        mapcn.map_heatmap_layer(
+            data=State.quakes,
+            weight_property="mag",      # a magnitude 8 counts more than a 4
+            weight_range=[4.0, 8.0],
+            max_zoom_fade=8,            # hand over to the point layer at zoom 8
+        )
+
+    Every paint prop takes a number or a MapLibre expression. A heatmap is not
+    interactive in MapLibre, so it has no events.
+    """
+
+    tag = "HeatmapLayer"
+    alias = "MapcnHeatmapLayer"
+
+    data: rx.Var[dict[str, Any] | str]
+    # heatmap-weight: how much one point counts.
+    weight: rx.Var[float | list]
+    # heatmap-intensity: global multiplier, usually a function of the zoom.
+    intensity: rx.Var[float | list]
+    # heatmap-radius, in pixels.
+    radius: rx.Var[float | list]
+    # heatmap-color: a ramp over ["heatmap-density"].
+    color: rx.Var[list]
+    opacity: rx.Var[float | list]
+    visible: rx.Var[bool]
+    before_id: rx.Var[str]
+    min_zoom: rx.Var[float]
+    max_zoom: rx.Var[float]
+
+    @classmethod
+    def create(cls, *children, **props) -> rx.Component:
+        """Turn the two Python-only shortcuts into MapLibre expressions."""
+        weight_property = props.pop("weight_property", None)
+        weight_range = props.pop("weight_range", None)
+        max_zoom_fade = props.pop("max_zoom_fade", None)
+
+        if props.get("data") is None:
+            raise ValueError("map_heatmap_layer: data is required")
+
+        if weight_property is not None and props.get("weight") is None:
+            if weight_range is None or len(weight_range) != 2:
+                raise ValueError(
+                    "map_heatmap_layer: weight_property needs weight_range=[min, max]"
+                )
+            low, high = weight_range
+            props["weight"] = interpolate(weight_property, [(low, 0), (high, 1)])
+
+        if max_zoom_fade is not None and props.get("opacity") is None:
+            # Fade out just before the zoom where a point layer takes over.
+            fade = [(max_zoom_fade - 1, 1), (max_zoom_fade, 0)]
+            props["opacity"] = zoom_interpolate(fade)
+
+        return super().create(*children, **props)
+
+
 # ---------------------------------------------------------------------------
 # Reflex extra: imperative camera
 # ---------------------------------------------------------------------------
@@ -764,6 +827,7 @@ map_cluster_layer = MapClusterLayer.create
 map_camera = MapCamera.create
 map_raster_layer = MapRasterLayer.create
 map_layer = MapLayer.create
+map_heatmap_layer = MapHeatmapLayer.create
 
 
 class MapcnNamespace(rx.ComponentNamespace):
@@ -807,6 +871,7 @@ __all__ = [
     "RasterLoadError",
     "MapMarker",
     "MapPopup",
+    "MapHeatmapLayer",
     "MapLayer",
     "MapRasterLayer",
     "MapRoute",
@@ -828,6 +893,7 @@ __all__ = [
     "map_geojson",
     "map_marker",
     "map_popup",
+    "map_heatmap_layer",
     "map_layer",
     "map_raster_layer",
     "map_route",

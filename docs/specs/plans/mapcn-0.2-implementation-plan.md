@@ -66,7 +66,7 @@ Cuatro fases incrementales, cada una deployable (el paquete sigue instalable y l
 | F2-02 | `RasterLayer` JSX + `MapRasterLayer` Python (validación, preset ⊕ props) + tests | 0.75d | F1-02, F2-01 | ✔ 2026-09-11 |
 | F2-03 | `rainviewer_frames/tiles` (httpx, timeout, warning) + tests con mock | 0.5d | F2-01 | ✔ 2026-09-11 |
 | F2-04 | `Layer` JSX + `MapLayer` Python (source dict/str, validación) + tests | 0.75d | F1-02 | ✔ 2026-09-11 |
-| F2-05 | `HeatmapLayer` JSX + `MapHeatmapLayer` (+ `weight_property`, `max_zoom_fade`) + tests | 0.5d | F2-04 | ☐ |
+| F2-05 | `HeatmapLayer` JSX + `MapHeatmapLayer` (+ `weight_property`, `max_zoom_fade`) + tests | 0.5d | F2-04 | ✔ 2026-09-11 |
 | F2-06 | `CircleLayer` JSX + `MapCircleLayer` (+ cluster COULD) + tests; benchmark 10k puntos manual | 0.75d | F2-04 | ☐ |
 | F2-07 | `SymbolLayer` JSX + `MapSymbolLayer` (+ `images`, glyphs warn) + `Map.glyphs_url` + tests | 1d | F2-06 | ☐ |
 | F2-08 | `MapTerrain` JSX + `MapTerrain` Python (+ hillshade, singleton, `elevation` COULD) + tests | 0.75d | F1-02, F2-01 | ☐ |
