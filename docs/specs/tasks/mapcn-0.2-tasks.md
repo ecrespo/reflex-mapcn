@@ -40,7 +40,7 @@
 - **Depende de:** T-003
 - **Done:** `bash tests/js/run.sh` → `ERRORS: none` y todas las aserciones `PASS`.
 
-### T-005 · Presets y helpers Python `[P]`
+### T-005 · Presets y helpers Python `[P]` — `[x] 2026-09-11`
 - **Qué:** `presets.py` con `RasterPreset`, `TerrainPreset`, `RASTER_PRESETS` (openrailwaymap, openseamap, esri_satellite, rainviewer) y `TERRAIN_PRESETS` (aws_terrarium) según API §3.7; `helpers.py` con `interpolate`, `step`, `match`, `zoom_interpolate`; tests.
 - **REQ:** REQ-RAS-005, REQ-TER-002, REQ-HEA-003 (helper)
 - **Archivos:** `custom_components/reflex_mapcn/presets.py`, `helpers.py`, `tests/test_presets.py`, `tests/test_helpers.py`
@@ -225,6 +225,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-11 | T-005 | OK | TDD: `tests/test_presets.py` y `tests/test_helpers.py` primero (rojo: módulos inexistentes), luego `presets.py` y `helpers.py`. 19 tests nuevos, 25 de pytest en total. Los helpers rechazan listas de stops vacías o no ascendentes, que MapLibre rechazaría en tiempo de estilo. |
 | 2026-09-11 | T-003, T-004 | OK | TDD: `tests/js/tests/layer_runtime.test.mjs` primero (rojo: no existía `useMapLayer`), luego el hook. 17/17 passing, ERRORS: none. Mutación de tres puntos del hook (setFilter, dedupe de advertencias, orden de limpieza) para comprobar que los tests discriminan; la primera versión del test de `before_id` no detectaba la mutación y se reforzó con una reconstrucción en frío. |
 | 2026-09-11 | T-001, T-002 | OK | Harness JSX versionado en `tests/js/` (stub MapLibre que registra llamadas y lanza donde lanza MapLibre, `render()` con act, runner Playwright). `bash tests/js/run.sh` → 2/2 passing, ERRORS: none. `ruff`, `compileall` y `pytest` (6) en verde. CHANGELOG ya existía desde 0.1.0. |
 
