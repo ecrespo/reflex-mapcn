@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo / Claude |
-| **Estado** | `DRAFT` — checkpoint 4 |
+| **Estado** | `APPROVED` — aprobado 2026-09-11 (checkpoint 4) |
 | **Versión** | 1.0 |
 | **Fecha** | 2026-09-11 |
 | **Almacenamiento** | Sin base de datos. Datos en: props/estado Reflex (JSON), archivos estáticos en `assets/`, caché TTL en memoria de proceso, y esquemas de servicios externos |

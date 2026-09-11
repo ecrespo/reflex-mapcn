@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo (redacción asistida por Claude) |
-| **Estado** | `DRAFT` — pendiente de revisión humana (checkpoint 1) |
+| **Estado** | `APPROVED` — aprobado 2026-09-11 (checkpoint 1) |
 | **Versión** | 1.1 |
 | **Fecha** | 2026-09-11 |
 | **Reviewers** | Ernesto Crespo |
@@ -284,5 +284,5 @@ Convenciones: `EL SISTEMA` = el paquete `reflex_mapcn` (JSX + wrapper) salvo que
 
 | Rol | Nombre | Fecha | Estado |
 |---|---|---|---|
-| Product owner | Ernesto Crespo | | ☐ Pendiente |
-| Tech lead | Ernesto Crespo | | ☐ Pendiente |
+| Product owner | Ernesto Crespo | 2026-09-11 | ☑ Aprobado |
+| Tech lead | Ernesto Crespo | 2026-09-11 | ☑ Aprobado |

@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo / Claude |
-| **Estado** | `DRAFT` — checkpoint 2 (revisar tras aprobar el PRD) |
+| **Estado** | `APPROVED` — aprobado 2026-09-11 (checkpoint 2) |
 | **Versión API** | 0.2.0 (SemVer del paquete) |
 | **Fecha** | 2026-09-11 |
 | **PRD relacionado** | `docs/specs/prd/mapcn-layers-0.2.md` |

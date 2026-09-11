@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo / Claude |
-| **Estado** | `DRAFT` — checkpoint 5 |
+| **Estado** | `APPROVED` — aprobado 2026-09-11 (checkpoint 5) |
 | **Versión** | 1.0 |
 | **Fecha** | 2026-09-11 |
 | **PRD** | `docs/specs/prd/mapcn-layers-0.2.md` |
@@ -28,12 +28,12 @@ Cuatro fases incrementales, cada una deployable (el paquete sigue instalable y l
 
 | Pre-requisito | Owner | Estado | Fecha límite |
 |---|---|---|---|
-| Specs aprobadas (PRD, API, Tech, Data, Plan) + Analyze sin CRÍTICOS | E. Crespo | ☐ | 2026-09-14 |
+| Specs aprobadas (PRD, API, Tech, Data, Plan) + Analyze sin CRÍTICOS | E. Crespo | ✔ 2026-09-11 | 2026-09-14 |
 | 0.1.0 publicado y tag `v0.1.0` en git | E. Crespo | ☐ (en curso) | 2026-09-12 |
-| Harness JSX (stub maplibre + Playwright) versionado en `tests/js/` (hoy solo existe en scratch) | Agente | ☐ | Fase 1 |
+| Harness JSX (stub maplibre + Playwright) versionado en `tests/js/` (hoy solo existe en scratch) | Agente | ✔ 2026-09-11 | Fase 1 |
 | Acceso a red desde la máquina de desarrollo para USGS/OSRM/GEM (no desde el sandbox de Cowork) | E. Crespo | ✔ | — |
-| `CHANGELOG.md` creado con sección 0.1.0 | Agente | ☐ | Fase 1 |
-| Tooling JS en la máquina de desarrollo: `bun` ≥ 1.2, Node ≥ 20 y `playwright` con Chromium (`npx playwright install chromium`) para `tests/js` | E. Crespo | ☐ | Fase 1 |
+| `CHANGELOG.md` creado con sección 0.1.0 | Agente | ✔ 2026-09-11 | Fase 1 |
+| Tooling JS en la máquina de desarrollo: `bun` ≥ 1.2, Node ≥ 20 y `playwright` con Chromium (`npx playwright install chromium`) para `tests/js` | E. Crespo | ✔ 2026-09-11 (bun 1.3.13, node 24, Chromium presente) | Fase 1 |
 
 ## 3. Fases
 
@@ -46,10 +46,10 @@ Cuatro fases incrementales, cada una deployable (el paquete sigue instalable y l
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| F1-01 | Versionar harness JSX: `tests/js/harness/maplibre-stub.js`, `run.mjs`, entry builder con bun | 0.5d | — | ☐ |
+| F1-01 | Versionar harness JSX: `tests/js/harness/maplibre-stub.js`, `run.mjs`, entry builder con bun | 0.5d | — | ✔ 2026-09-11 |
 | F1-02 | Implementar `useMapLayer` en `mapcn.jsx` (add/hot diff/cold recreate/eventos/hover/cleanup/images) | 1d | F1-01 | ☐ |
 | F1-03 | Tests JSX de `useMapLayer` con una capa `circle` de prueba: add, setData, setPaint, setFilter, style.load re-add, unmount, beforeId inexistente | 0.5d | F1-02 | ☐ |
-| F1-04 | `CHANGELOG.md` + sección "Unreleased" | 0.1d | — | ☐ |
+| F1-04 | `CHANGELOG.md` + sección "Unreleased" | 0.1d | — | ✔ 2026-09-11 |
 
 **Done:** `node tests/js/run.mjs` en verde; `python -m compileall` y ruff en verde; ninguna página 0.1.0 cambia de salida (diff de `.web/app/routes` antes/después vacío).
 

@@ -1,7 +1,7 @@
 # Tasks — reflex-mapcn 0.2.0 (capas avanzadas + demo Sismos)
 
 > Specs de origen: PRD `docs/specs/prd/mapcn-layers-0.2.md` · API `docs/specs/api/mapcn-components-api-v0.2.md` · Tech `docs/specs/technical/mapcn-layers-architecture.md` · Data `docs/specs/data-model/mapcn-layers-schema.md` · Plan `docs/specs/plans/mapcn-0.2-implementation-plan.md`
-> Fases que cubre: 1–4 · Generado: 2026-09-11 · Estado global: `DRAFT` (ejecutar solo tras aprobar specs y Analyze)
+> Fases que cubre: 1–4 · Generado: 2026-09-11 · Estado global: `APPROVED` — en ejecución desde 2026-09-11
 
 ## Convenciones
 
@@ -14,14 +14,14 @@
 
 ### Fase 1 — Runtime y harness
 
-### T-001 · Versionar harness JSX `[P]`
+### T-001 · Versionar harness JSX `[P]` — `[x] 2026-09-11`
 - **Qué:** mover el harness de pruebas (stub de `maplibre-gl`, `run.mjs` con Playwright, bundler con bun) a `tests/js/harness/`; añadir script `tests/js/run.sh` que bundlea `mapcn.jsx` + entry de prueba y ejecuta en Chromium; documentar en `tests/js/README.md`.
 - **REQ:** transversal (Art. 6)
 - **Archivos:** `tests/js/harness/maplibre-stub.js`, `tests/js/harness/run.mjs`, `tests/js/run.sh`, `tests/js/README.md`
 - **Depende de:** —
 - **Done:** `bash tests/js/run.sh` ejecuta los smoke tests 0.1.0 existentes y termina con `ERRORS: none`.
 
-### T-002 · Crear `CHANGELOG.md` `[P]`
+### T-002 · Crear `CHANGELOG.md` `[P]` — `[x] 2026-09-11`
 - **Qué:** Keep a Changelog con `## [0.1.0]` (contenido actual) y `## [Unreleased]`.
 - **REQ:** Art. 7
 - **Archivos:** `CHANGELOG.md`
@@ -225,6 +225,6 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
-| — | — | — | Pendiente de aprobación de specs |
+| 2026-09-11 | T-001, T-002 | OK | Harness JSX versionado en `tests/js/` (stub MapLibre que registra llamadas y lanza donde lanza MapLibre, `render()` con act, runner Playwright). `bash tests/js/run.sh` → 2/2 passing, ERRORS: none. `ruff`, `compileall` y `pytest` (6) en verde. CHANGELOG ya existía desde 0.1.0. |
 
 Si al implementar se descubre que la spec estaba mal: parar, abrir Delta en `docs/changes/`, y solo entonces seguir.
