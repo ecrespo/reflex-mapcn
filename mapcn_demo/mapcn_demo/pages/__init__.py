@@ -10,5 +10,6 @@ from . import (  # noqa: F401
     markers,
     popups,
     routes,
+    sismos,
     venezuela,
 )

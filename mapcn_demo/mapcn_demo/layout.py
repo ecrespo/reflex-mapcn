@@ -15,6 +15,7 @@ NAV = [
     ("Clusters", "/clusters", "circle-dot"),
     ("Advanced", "/advanced", "settings-2"),
     ("Venezuela", "/venezuela", "flag"),
+    ("Sismos", "/sismos", "activity"),
 ]
 
 

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import dataclasses
 
+from reflex_mapcn import interpolate, step
+
 # Served by Reflex from the demo's assets/ folder.
 VENEZUELA_STATES_URL = "/venezuela_estados.geojson"
 
@@ -29,6 +31,44 @@ SLIP_TYPE_COLORS = {
     "Normal": "#3b82f6",
 }
 SLIP_TYPE_DEFAULT_COLOR = "#64748b"
+
+# Seismic styling, shared by the map layers and the legend of /sismos.
+# Radius grows with magnitude and colour steps through the three depth bands
+# seismology uses: shallow, intermediate and deep.
+MAG_RADIUS = interpolate("mag", [(4, 4), (5, 8), (6, 14), (7, 24), (8, 34)])
+DEPTH_COLOR = step("depth", "#ef4444", [(70, "#f97316"), (300, "#3b82f6")])
+DEPTH_BANDS = {"shallow": (0, 70), "intermediate": (70, 300), "deep": (300, 1000)}
+
+
+@dataclasses.dataclass(frozen=True)
+class NotableQuake:
+    """A historical earthquake worth marking on the map."""
+
+    date: str
+    name: str
+    magnitude: float
+    longitude: float
+    latitude: float
+    source: str
+
+
+# The USGS catalogue is only complete for Venezuela from about 1973 onwards,
+# so the earthquakes everyone remembers are listed by hand.
+NOTABLE_QUAKES: list[NotableQuake] = [
+    NotableQuake(
+        "1812-03-26",
+        "Terremoto de Caracas 1812",
+        7.7,
+        -66.9,
+        10.5,
+        "FUNVISIS/USGS hist.",
+    ),
+    NotableQuake("1967-07-29", "Terremoto de Caracas 1967", 6.6, -67.1, 10.6, "USGS"),
+    NotableQuake("1997-07-09", "Terremoto de Cariaco", 6.9, -63.5, 10.6, "USGS"),
+    NotableQuake(
+        "2018-08-21", "Sismo de Boca de Uchire / Yaguaraparo", 7.3, -62.9, 10.8, "USGS"
+    ),
+]
 
 # Rough country box used for the initial fit and to keep the camera nearby.
 VENEZUELA_BOUNDS = [[-73.6, 0.5], [-59.5, 12.5]]
