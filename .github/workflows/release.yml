@@ -52,12 +52,13 @@ jobs:
           import pathlib, tomli
           print(tomli.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])
           ')"
-          status="$(curl -sS -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/reflex-mapcn/${version}/json")"
-          if [[ "$status" == "200" ]]; then
+          # Not named `status`: that identifier is read-only in some shells.
+          http_code="$(curl -sS -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/reflex-mapcn/${version}/json")"
+          if [[ "$http_code" == "200" ]]; then
             echo "::error::reflex-mapcn ${version} is already on PyPI. Bump the version; PyPI never allows re-uploading one."
             exit 1
           fi
-          echo "Version ${version} is free on PyPI (HTTP ${status})."
+          echo "Version ${version} is free on PyPI (HTTP ${http_code})."
 
   validate:
     # The same gate that guards develop and main, re-run against the tagged
