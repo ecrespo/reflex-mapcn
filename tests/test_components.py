@@ -234,3 +234,54 @@ def test_REQ_RAS_011_on_load_error_is_wired_as_an_event_handler():
         )
     )
     assert "onLoadError" in rendered
+
+
+def test_REQ_LAY_001_generic_layer_renders_with_source_and_layer():
+    rendered = _render(
+        mapcn.map(
+            mapcn.map_layer(
+                id="faults",
+                source={"type": "geojson", "data": "/faults.geojson"},
+                layer={"type": "line", "paint": {"line-color": "#ef4444"}},
+                interactive=True,
+                on_hover=_State.on_geo,
+            )
+        )
+    )
+    assert "MapcnLayer" in rendered
+    assert "onHover" in rendered
+    assert "interactive" in rendered
+
+
+def test_REQ_LAY_002_source_can_be_the_id_of_a_style_source():
+    layer = mapcn.map_layer(
+        source="openmaptiles",
+        layer={"type": "fill-extrusion", "source-layer": "building", "minzoom": 14},
+    )
+    assert "openmaptiles" in _prop(layer, "source")
+
+
+def test_REQ_LAY_007_a_layer_without_a_type_is_rejected_at_creation():
+    with pytest.raises(ValueError, match="layer.type is required"):
+        mapcn.map_layer(
+            source={"type": "geojson", "data": "/x.geojson"},
+            layer={"paint": {"line-color": "#000"}},
+        )
+
+
+def test_REQ_LAY_007_a_source_that_is_neither_dict_nor_id_is_rejected():
+    with pytest.raises(ValueError, match="source must be a dict or a source id"):
+        mapcn.map_layer(source=42, layer={"type": "line"})
+
+
+def test_REQ_LAY_007_source_and_layer_are_both_required():
+    with pytest.raises(ValueError, match="source is required"):
+        mapcn.map_layer(layer={"type": "line"})
+    with pytest.raises(ValueError, match="layer is required"):
+        mapcn.map_layer(source={"type": "geojson", "data": "/x.geojson"})
+
+
+def test_REQ_LAY_007_a_state_var_source_is_not_validated_eagerly():
+    # A Var resolves in the browser; validating it here would reject valid code.
+    component = mapcn.map_layer(source=_State.viewport, layer={"type": "line"})
+    assert isinstance(component, mapcn.MapLayer)

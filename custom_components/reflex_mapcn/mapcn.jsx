@@ -2601,6 +2601,67 @@ function RasterLayer({
 }
 
 // ---------------------------------------------------------------------------
+// Generic layer (Reflex extra)
+// ---------------------------------------------------------------------------
+
+/**
+ * Any MapLibre source and layer, straight from Python.
+ *
+ * This is the escape hatch: whatever this package does not wrap yet, from
+ * extruded buildings over the basemap's own vector tiles to a video overlay,
+ * is one `map_layer` away. `source` is either a source specification or the id
+ * of a source the style already provides; the layer receives its id and its
+ * source automatically.
+ */
+function Layer({
+  id: propId,
+  source,
+  layer,
+  beforeId,
+  interactive = false,
+  hoverPaint,
+  visible = true,
+  onClick,
+  onHover,
+}) {
+  const autoId = useId();
+  const id = propId ?? autoId;
+
+  const stableSource = useStableValue(source);
+  const stableLayer = useStableValue(layer);
+
+  const usesStyleSource = typeof stableSource === "string";
+  const sourceId = usesStyleSource ? stableSource : `layer-source-${id}`;
+
+  const layers = useMemo(() => {
+    const { id: ignoredId, source: ignoredSource, layout, ...rest } = stableLayer ?? {};
+    return [
+      {
+        ...rest,
+        id: `layer-${id}`,
+        layout: {
+          ...(layout ?? {}),
+          visibility: visible ? (layout?.visibility ?? "visible") : "none",
+        },
+      },
+    ];
+  }, [stableLayer, id, visible]);
+
+  useMapLayer({
+    id,
+    sourceId,
+    source: usesStyleSource ? null : stableSource,
+    layers,
+    beforeId,
+    interactive,
+    hoverPaint,
+    callbacks: { onClick, onHover },
+  });
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Reflex helpers
 // ---------------------------------------------------------------------------
 
@@ -2639,6 +2700,7 @@ export {
   useMap,
   useMapLayer,
   RasterLayer,
+  Layer,
   MapMarker,
   MarkerContent,
   MarkerPopup,

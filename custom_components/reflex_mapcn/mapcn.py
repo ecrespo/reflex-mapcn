@@ -130,6 +130,11 @@ class MapGeoJSONEvent(TypedDict):
     latitude: float
 
 
+#: 0.2.0 name of the layer feature payload. Same shape as ``MapGeoJSONEvent``
+#: (Analyze A-09): every layer component delivers one of these.
+LayerFeatureEvent = MapGeoJSONEvent
+
+
 class MapArcEvent(TypedDict):
     """Payload of ``MapArc.on_click`` / ``on_hover``."""
 
@@ -618,6 +623,78 @@ class MapRasterLayer(MapcnComponent):
         return super().create(*children, **props)
 
 
+class MapLayer(MapcnComponent):
+    """Any MapLibre source and layer, declared from Python (Reflex extra).
+
+    The escape hatch for everything this package does not wrap yet::
+
+        # Extruded buildings over the basemap's own vector tiles.
+        mapcn.map_layer(
+            source="openmaptiles",
+            layer={
+                "type": "fill-extrusion",
+                "source-layer": "building",
+                "minzoom": 14,
+                "paint": {"fill-extrusion-height": ["get", "render_height"]},
+            },
+        )
+
+        # A GeoJSON file served by the app.
+        mapcn.map_layer(
+            source={"type": "geojson", "data": "/faults.geojson"},
+            layer={"type": "line", "paint": {"line-color": "#ef4444"}},
+            interactive=True,
+            on_hover=State.show_fault,
+        )
+
+    ``source`` is either a MapLibre source specification or the id of a source
+    the active style already provides. The layer gets its id and its source
+    injected, so leave both out. ``data``, ``paint``, ``layout`` and ``filter``
+    are applied without recreating the layer; anything else rebuilds it.
+
+    A source id the style does not provide is not an error: the layer is
+    skipped with a console warning and retried after the next style load.
+    """
+
+    tag = "Layer"
+    alias = "MapcnLayer"
+
+    # A MapLibre source specification, or the id of an existing source.
+    source: rx.Var[dict[str, Any] | str]
+    # A MapLibre layer specification without `id` and `source`.
+    layer: rx.Var[dict[str, Any]]
+    before_id: rx.Var[str]
+    # Off by default: a generic layer may well be raster or background.
+    interactive: rx.Var[bool]
+    # Merged over `layer.paint` behind `feature-state.hover`.
+    hover_paint: rx.Var[dict[str, Any]]
+    visible: rx.Var[bool]
+
+    on_click: rx.EventHandler[passthrough_event_spec(LayerFeatureEvent)]
+    # Receives the event, or None when the cursor leaves the layer.
+    on_hover: rx.EventHandler[passthrough_event_spec(LayerFeatureEvent)]
+
+    @classmethod
+    def create(cls, *children, **props) -> rx.Component:
+        """Reject a layer MapLibre would refuse, before the app compiles."""
+        source = props.get("source")
+        layer = props.get("layer")
+
+        if source is None:
+            raise ValueError("map_layer: source is required")
+        if layer is None:
+            raise ValueError("map_layer: layer is required")
+
+        # A Var only resolves in the browser; validating it here would reject
+        # perfectly good code.
+        if not isinstance(source, (rx.Var, dict, str)):
+            raise ValueError("map_layer: source must be a dict or a source id")
+        if isinstance(layer, dict) and not layer.get("type"):
+            raise ValueError("map_layer: layer.type is required")
+
+        return super().create(*children, **props)
+
+
 # ---------------------------------------------------------------------------
 # Reflex extra: imperative camera
 # ---------------------------------------------------------------------------
@@ -686,6 +763,7 @@ map_geojson = MapGeoJSON.create
 map_cluster_layer = MapClusterLayer.create
 map_camera = MapCamera.create
 map_raster_layer = MapRasterLayer.create
+map_layer = MapLayer.create
 
 
 class MapcnNamespace(rx.ComponentNamespace):
@@ -724,10 +802,12 @@ __all__ = [
     "MapClusterLayer",
     "MapControls",
     "MapGeoJSON",
+    "LayerFeatureEvent",
     "MapGeoJSONEvent",
     "RasterLoadError",
     "MapMarker",
     "MapPopup",
+    "MapLayer",
     "MapRasterLayer",
     "MapRoute",
     "MapViewport",
@@ -748,6 +828,7 @@ __all__ = [
     "map_geojson",
     "map_marker",
     "map_popup",
+    "map_layer",
     "map_raster_layer",
     "map_route",
     "mapcn",

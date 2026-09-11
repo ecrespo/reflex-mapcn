@@ -62,7 +62,7 @@
 - **Depende de:** T-005
 - **Done:** tests de éxito, timeout y JSON inválido en verde; ejemplo en README.
 
-### T-008 · `map_layer` genérico
+### T-008 · `map_layer` genérico — `[x] 2026-09-11`
 - **Qué:** `Layer` en JSX (source dict o id; layer spec con `type`; inyección de `source`/`id`; id de fuente inexistente ⇒ omitir + warn + reintento tras style.load) sobre `useMapLayer`; `MapLayer` Python con `ValueError` si falta `layer.type` o `source` inválido; `interactive`, `hover_paint`, eventos.
 - **REQ:** REQ-LAY-001..010
 - **Archivos:** `mapcn.jsx`, `mapcn.py`, `tests/test_components.py`, `tests/js/test_layer.mjs`
@@ -225,6 +225,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-11 | T-008 | OK | TDD: 6 tests de pytest (validación temprana y props) y 5 en Chromium (fuente por diccionario, fuente del estilo por id que solo añade la capa y no se borra al desmontar, fusión de pintura de hover, visibilidad, id de fuente inexistente). Se aplica de paso el hallazgo A-09: `LayerFeatureEvent` se exporta como alias de `MapGeoJSONEvent`. 48 tests Python y 30 JSX en verde. |
 | 2026-09-11 | T-007 | OK | TDD: 8 tests con el cliente HTTP simulado antes del código (éxito, timeout, JSON inválido, estado 503, payload sin radar, plantilla de teselas y sus opciones). `helpers.py` importa `httpx` directamente, así que se declara como dependencia explícita en `pyproject.toml`; ya venía con reflex. 42 tests Python y 25 JSX en verde. |
 | 2026-09-11 | T-006 | OK | TDD en dos frentes: 9 tests de pytest y 8 en Chromium, escritos antes del componente. Decisión de implementación: el rango de zoom sale de la clave de reconstrucción del hook (`sourceIdentity`), porque REQ-RAS-002 exige aplicarlo con `setLayerZoomRange` sin recrear la fuente; la fuente conserva su `maxzoom` nativo para que el sobre-zoom siga funcionando. 34 tests Python y 25 JSX en verde. |
 | 2026-09-11 | T-005 | OK | TDD: `tests/test_presets.py` y `tests/test_helpers.py` primero (rojo: módulos inexistentes), luego `presets.py` y `helpers.py`. 19 tests nuevos, 25 de pytest en total. Los helpers rechazan listas de stops vacías o no ascendentes, que MapLibre rechazaría en tiempo de estilo. |
