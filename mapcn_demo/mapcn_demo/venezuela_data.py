@@ -12,6 +12,24 @@ import dataclasses
 # Served by Reflex from the demo's assets/ folder.
 VENEZUELA_STATES_URL = "/venezuela_estados.geojson"
 
+# Active faults from the GEM Global Active Faults database, clipped to the
+# country and simplified by `scripts/build_faults.py`. Rerun that script to
+# refresh the file; the licence requires the attribution below wherever the
+# faults are drawn.
+VENEZUELA_FAULTS_URL = "/venezuela_fallas.geojson"
+FAULTS_ATTRIBUTION = "GEM Global Active Faults (CC BY-SA 4.0)"
+
+# Colour per slip type. Anything not listed, `null` included, draws slate.
+SLIP_TYPE_COLORS = {
+    "Dextral": "#ef4444",
+    "Sinistral": "#f97316",
+    "Reverse": "#a855f7",
+    "Thrust": "#a855f7",
+    "Subduction_Thrust": "#a855f7",
+    "Normal": "#3b82f6",
+}
+SLIP_TYPE_DEFAULT_COLOR = "#64748b"
+
 # Rough country box used for the initial fit and to keep the camera nearby.
 VENEZUELA_BOUNDS = [[-73.6, 0.5], [-59.5, 12.5]]
 VENEZUELA_MAX_BOUNDS = [[-80.0, -3.0], [-53.0, 18.0]]

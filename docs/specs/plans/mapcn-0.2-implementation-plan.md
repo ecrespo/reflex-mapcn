@@ -84,7 +84,7 @@ Cuatro fases incrementales, cada una deployable (el paquete sigue instalable y l
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
 | F3-01 | `services/cache.py` (TTL) + `services/usgs.py` (catálogo, live, recorte) + tests con fixtures | 0.75d | — | ✔ 2026-09-11 |
-| F3-02 | `scripts/build_faults.py` + generar `assets/venezuela_fallas.geojson` + atribución | 0.5d | — | ☐ |
+| F3-02 | `scripts/build_faults.py` + generar `assets/venezuela_fallas.geojson` + atribución | 0.5d | — | ✔ 2026-09-11 |
 | F3-03 | Página `/sismos`: estado, capa circle, filtros, slider temporal y ▶, popup, leyenda, notables | 1d | F2-06, F3-01 | ☐ |
 | F3-04 | En vivo (bg loop 60 s + capa recientes), Densidad (heatmap), Fallas (map_layer), Relieve (terrain) | 0.5d | F3-03, F2-05, F2-04, F2-08, F3-02 | ☐ |
 | F3-05 | `services/osrm.py` (table + route, caché) + tests; UI "Tiempos de viaje" en `/venezuela` con tabla y ruta | 0.75d | — | ☐ |

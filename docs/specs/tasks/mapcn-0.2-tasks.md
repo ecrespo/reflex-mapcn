@@ -107,7 +107,7 @@
 - **Archivos:** `mapcn_demo/mapcn_demo/services/{__init__,cache,usgs}.py`, `tests/demo/test_usgs.py`
 - **Done:** pytest en verde; tamaño de salida con fixture real ≤ 25 % del original.
 
-### T-015 · Script de fallas GEM + asset `[P]`
+### T-015 · Script de fallas GEM + asset `[P]` — `[x] 2026-09-11`
 - **Qué:** `scripts/build_faults.py` (descarga, recorte a bbox ampliada, simplificación, propiedades mínimas) y ejecutar una vez en máquina con red; commitear `mapcn_demo/assets/venezuela_fallas.geojson`; atribución en `venezuela_data.py`.
 - **REQ:** REQ-SIS-009, REQ-SIS-012
 - **Done:** archivo ≤ 300 KB, ≥ 30 features, `python -c "import json; json.load(open(...))"` OK.
@@ -225,6 +225,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-11 | T-015 | OK | TDD: 13 tests, primero las funciones puras con geometría sintética. La primera versión filtraba fallas pero no recortaba geometrías, y el test del asset lo detectó: una falla llegaba a 19,7° N. Se añadió `clip_line`, que parte la línea en tramos dentro de la caja y conserva el vértice de cruce para que la línea llegue al borde. Descargado el catálogo GEM (10,6 MB) y generado `mapcn_demo/assets/venezuela_fallas.geojson`: 255 fallas, 86 KB, muy por debajo del presupuesto de 300 KB. Atribución CC BY-SA 4.0 y colores por tipo de desplazamiento en `venezuela_data.py`. 95 tests Python y 56 JSX en verde. |
 | 2026-09-11 | T-014 | OK | TDD: 13 tests con una respuesta real del USGS guardada como fixture y sin red. Recorte a 8 propiedades: 33 % del tamaño original con la fixture (medido, no estimado). Caché con reloj inyectable para probar la expiración sin dormir. El camino degradado guarda el último valor bueno con un TTL cien veces mayor, así que un timeout conserva lo que la página ya mostraba; verificado con una mutación que lo elimina. `pythonpath` de pytest incluye `mapcn_demo` para poder probar sus servicios sin instalarla. 82 tests Python en verde. |
 | 2026-09-11 | T-013 | OK | TDD: 4 tests que exigen factorías en `__all__`, alias `Mapcn*`, espacio de nombres, presets y helpers accesibles desde el paquete, y stubs que declaran los seis componentes. `__init__.py` reexporta `presets` y `helpers` (Tech §5.1). `reflex component build` regenera `mapcn.pyi` (+358 líneas). README: tabla de capas, tabla de presets con licencia y atribución, y cinco recetas (puntos masivos, radar, tráfico con clave propia, edificios 3D, relieve). La comprobación de la rueda en CI ahora exige `presets.py` y `helpers.py`; verificado que ambos viajan. Fase 2 completa. 69 tests Python y 56 JSX en verde. |
 | 2026-09-11 | T-012 | OK | TDD: 5 tests de pytest (preset, precedencia, validación) y 8 en Chromium (fuente raster-dem y activación, hillshade con pintura fusionada, exageración en caliente sin recrear la fuente, apagado al desmontar, restauración tras cambio de estilo, segundo terreno que reemplaza avisando, elevación en el viewport, fallo de teselas DEM). El mapa guarda el terreno activo en un ref del contexto, así que un desmontaje tardío no apaga el relieve de otro componente. Refactor: el informe de error de teselas se comparte entre raster y terreno. 65 tests Python y 56 JSX en verde. Con esto los seis componentes de F1-F5 están completos. |

@@ -19,7 +19,7 @@
 | A-11 | BAJO | Terminología | "capa de puntos" (PRD) vs "point layers" (Tech) vs `map_circle_layer`/`map_symbol_layer` (API): consistente en identificadores; el término genérico varía por idioma (Art. 9). | PRD, Tech | Sin acción | Cerrado |
 | A-12 | BAJO | Datos | El histórico USGS anterior a 1973 es incompleto para Venezuela (solo grandes eventos); el slider desde 1900 puede sugerir ausencia de actividad. | PRD REQ-SIS-004 | Mostrar nota en el panel: "Catálogo USGS: completo aprox. desde 1973 para M ≥ 4.5" | Pendiente (recomendado, sin REQ nuevo; texto de UI) |
 | A-13 | BAJO | Constitución | Art. 3 (una sola dependencia npm) vs. tooling de tests (bun/playwright): son dependencias de desarrollo, no del paquete. | Constitución, Plan | Aclarar en Art. 3 "en el paquete publicado" en la próxima enmienda | Pendiente (enmienda menor) |
-| A-14 | BAJO | Ejecutabilidad | T-015 (script GEM) requiere red y el repo GEM usa Git LFS; desde el sandbox de Cowork no fue posible descargarlo. | Tasks T-015 | Ejecutar T-015 en la máquina del dev; si LFS falla, usar la release ZIP del repo GEM | Pendiente (nota operativa) |
+| A-14 | BAJO | Ejecutabilidad | T-015 (script GEM) requiere red y el repo GEM usa Git LFS; desde el sandbox de Cowork no fue posible descargarlo. | Tasks T-015 | Ejecutar T-015 en la máquina del dev; si LFS falla, usar la release ZIP del repo GEM | **Resuelto** (2026-09-11): el GeoJSON se sirve por raw.githubusercontent sin LFS (10,6 MB) |
 
 ## Verificaciones de cobertura
 
