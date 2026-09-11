@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reflex-mapcn"
+version = "0.1.0"
+description = "mapcn (MapLibre GL) map components for Reflex: maps, markers, popups, controls, routes, arcs, GeoJSON layers and clusters."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Ernesto Crespo", email = "ecrespo@gmail.com" }]
+keywords = [
+  "reflex",
+  "reflex-custom-components",
+  "mapcn",
+  "maplibre",
+  "map",
+  "geojson",
+  "markers",
+]
+
+dependencies = ["reflex>=0.8.1"]
+
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Framework :: Reflex",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: GIS",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/ecrespo/reflex-mapcn"
+Source = "https://github.com/ecrespo/reflex-mapcn"
+Issues = "https://github.com/ecrespo/reflex-mapcn/issues"
+"mapcn (upstream)" = "https://www.mapcn.dev"
+
+[project.optional-dependencies]
+dev = ["build", "twine", "ruff", "pytest"]
+
+[tool.setuptools.packages.find]
+where = ["custom_components"]
+
+[tool.setuptools.package-data]
+reflex_mapcn = ["*.jsx", "*.css", "py.typed"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["A001", "A003"]
