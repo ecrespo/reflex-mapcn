@@ -27,14 +27,14 @@
 - **Archivos:** `CHANGELOG.md`
 - **Done:** archivo existe; enlace desde README.
 
-### T-003 · Implementar `useMapLayer`
+### T-003 · Implementar `useMapLayer` — `[x] 2026-09-11`
 - **Qué:** hook en `mapcn.jsx` con la firma de Data Model §2.1: add cuando `isLoaded`; diff caliente (`setData`, `setPaintProperty`, `setLayoutProperty`, `setFilter`, `setLayerZoomRange`, `moveLayer`); recreación por `coldKey`; `interactive` con cursor, `feature-state.hover`, `onClick`/`onHover` con `LayerFeatureEvent` (usa `serializeFeature`); `images` con `loadImage/addImage/removeImage`; `resolveBeforeId` con warn una vez; cleanup en orden inverso con try/catch.
 - **REQ:** REQ-LAY-001, 003, 004, 005, 006, 008, 009; REQ-RAS-002, 003, 008, 009; REQ-PNT-003, 006, 009; REQ-HEA-005, 006
 - **Archivos:** `custom_components/reflex_mapcn/mapcn.jsx` (sección "Layer runtime")
 - **Depende de:** T-001
 - **Done:** `bun build` sin errores; T-004 en verde.
 
-### T-004 · Tests JSX de `useMapLayer`
+### T-004 · Tests JSX de `useMapLayer` — `[x] 2026-09-11` (escritos antes que T-003, TDD)
 - **Qué:** `tests/js/test_layer_runtime.mjs`: monta una capa circle de prueba y verifica add (ids), `setData`, `setPaintProperty` tras cambio de prop, `setFilter`, `beforeId` inexistente (warn + capa al final), re-add tras `style.load`, payload de `onClick`/`onHover` (serializable, `null` al salir), cleanup total al desmontar (sin capas/fuentes/listeners).
 - **REQ:** los de T-003
 - **Depende de:** T-003
@@ -225,6 +225,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-11 | T-003, T-004 | OK | TDD: `tests/js/tests/layer_runtime.test.mjs` primero (rojo: no existía `useMapLayer`), luego el hook. 17/17 passing, ERRORS: none. Mutación de tres puntos del hook (setFilter, dedupe de advertencias, orden de limpieza) para comprobar que los tests discriminan; la primera versión del test de `before_id` no detectaba la mutación y se reforzó con una reconstrucción en frío. |
 | 2026-09-11 | T-001, T-002 | OK | Harness JSX versionado en `tests/js/` (stub MapLibre que registra llamadas y lanza donde lanza MapLibre, `render()` con act, runner Playwright). `bash tests/js/run.sh` → 2/2 passing, ERRORS: none. `ruff`, `compileall` y `pytest` (6) en verde. CHANGELOG ya existía desde 0.1.0. |
 
 Si al implementar se descubre que la spec estaba mal: parar, abrir Delta en `docs/changes/`, y solo entonces seguir.

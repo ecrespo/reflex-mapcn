@@ -54,6 +54,21 @@ export async function assertThrows(fn, message = "expected a throw") {
   throw new Error(message);
 }
 
+/** Collect `console.warn` output produced while `fn` runs. */
+export async function withWarnings(fn) {
+  const original = console.warn;
+  const warnings = [];
+  console.warn = (...args) => {
+    warnings.push(args.map(String).join(" "));
+  };
+  try {
+    await fn();
+  } finally {
+    console.warn = original;
+  }
+  return warnings;
+}
+
 export async function runAll() {
   const results = [];
   for (const { name, fn } of registry) {

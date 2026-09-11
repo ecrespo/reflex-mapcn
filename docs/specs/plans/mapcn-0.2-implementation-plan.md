@@ -47,8 +47,8 @@ Cuatro fases incrementales, cada una deployable (el paquete sigue instalable y l
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
 | F1-01 | Versionar harness JSX: `tests/js/harness/maplibre-stub.js`, `run.mjs`, entry builder con bun | 0.5d | — | ✔ 2026-09-11 |
-| F1-02 | Implementar `useMapLayer` en `mapcn.jsx` (add/hot diff/cold recreate/eventos/hover/cleanup/images) | 1d | F1-01 | ☐ |
-| F1-03 | Tests JSX de `useMapLayer` con una capa `circle` de prueba: add, setData, setPaint, setFilter, style.load re-add, unmount, beforeId inexistente | 0.5d | F1-02 | ☐ |
+| F1-02 | Implementar `useMapLayer` en `mapcn.jsx` (add/hot diff/cold recreate/eventos/hover/cleanup/images) | 1d | F1-01 | ✔ 2026-09-11 |
+| F1-03 | Tests JSX de `useMapLayer` con una capa `circle` de prueba: add, setData, setPaint, setFilter, style.load re-add, unmount, beforeId inexistente | 0.5d | F1-02 | ✔ 2026-09-11 |
 | F1-04 | `CHANGELOG.md` + sección "Unreleased" | 0.1d | — | ✔ 2026-09-11 |
 
 **Done:** `node tests/js/run.mjs` en verde; `python -m compileall` y ruff en verde; ninguna página 0.1.0 cambia de salida (diff de `.web/app/routes` antes/después vacío).

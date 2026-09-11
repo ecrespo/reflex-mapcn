@@ -2113,6 +2113,344 @@ function MapClusterLayer({
 }
 
 // ---------------------------------------------------------------------------
+// Layer runtime (Reflex extra)
+// ---------------------------------------------------------------------------
+
+/**
+ * Shared lifecycle for every 0.2.0 layer component.
+ *
+ * One place decides when a source and its layers are added, which prop changes
+ * can be applied in place and which ones need a rebuild, how interaction is
+ * wired, and in what order everything is torn down. The 0.1.0 components keep
+ * their hand-written effects; they move over in a later release.
+ *
+ * ```js
+ * useMapLayer({
+ *   id: "quakes",                                  // only used in warnings
+ *   sourceId: "circle-source-quakes",              // created, or reused when `source` is null
+ *   source: { type: "geojson", data },             // null to attach to an existing source
+ *   layers: [{ id: "circle-layer-quakes", type: "circle", paint, layout, filter }],
+ *   beforeId, interactive, hoverPaint, images,
+ *   hotKeys: ["data", "paint", "layout", "filter", "zoomRange", "beforeId", "images"],
+ *   callbacks: { onClick, onHover },
+ * });
+ * ```
+ */
+
+const HOT_GROUPS = ["data", "paint", "layout", "filter", "zoomRange", "beforeId", "images"];
+
+/** The source without its payload: what a rebuild must watch. */
+function sourceWithoutData(source) {
+  if (!source) return null;
+  const { data, ...rest } = source;
+  return rest;
+}
+
+/** The part of a layer that cannot change without recreating it. */
+function layerIdentity(layers) {
+  return layers.map((layer) => ({
+    id: layer.id,
+    type: layer.type,
+    sourceLayer: layer["source-layer"] ?? null,
+  }));
+}
+
+function isSame(a, b) {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
+function useMapLayer({
+  id,
+  sourceId,
+  source,
+  layers = [],
+  beforeId,
+  interactive = false,
+  hoverPaint,
+  images,
+  hotKeys,
+  callbacks,
+}) {
+  const { map, isLoaded } = useMap();
+
+  const stableSource = useStableValue(source);
+  const stableLayers = useStableValue(layers);
+  const stableImages = useStableValue(images);
+  const stableHoverPaint = useStableValue(hoverPaint);
+  const stableHotKeys = useStableValue(hotKeys ?? HOT_GROUPS);
+
+  const callbacksRef = useRef(callbacks);
+  callbacksRef.current = callbacks ?? {};
+
+  // Warn at most once per message for the life of the component: a missing
+  // `before_id` must not fill the console on every state update.
+  const warnedRef = useRef(null);
+  if (warnedRef.current === null) warnedRef.current = new Set();
+  const warnOnce = useCallback((message) => {
+    if (warnedRef.current.has(message)) return;
+    warnedRef.current.add(message);
+    console.warn(message);
+  }, []);
+
+  const hot = useMemo(() => new Set(stableHotKeys), [stableHotKeys]);
+
+  const resolvedLayers = useMemo(() => {
+    if (!stableHoverPaint) return stableLayers;
+    return stableLayers.map((layer, index) =>
+      index === 0
+        ? { ...layer, paint: mergeHoverPaint(layer.paint ?? {}, stableHoverPaint) }
+        : layer,
+    );
+  }, [stableLayers, stableHoverPaint]);
+
+  // Everything the map cannot be told about after the fact.
+  const coldKey = useMemo(
+    () =>
+      JSON.stringify({
+        sourceId,
+        source: sourceWithoutData(stableSource),
+        layers: layerIdentity(resolvedLayers),
+      }),
+    [sourceId, stableSource, resolvedLayers],
+  );
+
+  // Everything it can.
+  const snapshot = useCallback(
+    () => ({
+      data: stableSource?.data,
+      beforeId: beforeId ?? null,
+      layers: resolvedLayers.map((layer) => ({
+        paint: layer.paint ?? {},
+        layout: layer.layout ?? {},
+        filter: layer.filter ?? null,
+        minzoom: layer.minzoom ?? null,
+        maxzoom: layer.maxzoom ?? null,
+      })),
+    }),
+    [stableSource, resolvedLayers, beforeId],
+  );
+
+  const appliedRef = useRef(null);
+  const addedLayersRef = useRef([]);
+  const addedImagesRef = useRef([]);
+  const [retryToken, setRetryToken] = useState(0);
+
+  const loadImageInto = useCallback(
+    async (name, url) => {
+      try {
+        const image = await map.loadImage(url);
+        if (!map.hasImage(name)) map.addImage(name, image?.data ?? image);
+        if (!addedImagesRef.current.includes(name)) addedImagesRef.current.push(name);
+        return true;
+      } catch {
+        warnOnce(`mapcn: image "${name}" failed to load`);
+        return false;
+      }
+    },
+    [map, warnOnce],
+  );
+
+  // Add / rebuild.
+  useEffect(() => {
+    if (!map || !isLoaded) return undefined;
+
+    let cancelled = false;
+    let retryHandler = null;
+    const ownsSource = !!stableSource;
+
+    const addLayers = () => {
+      const target = resolveBeforeId(map, beforeId);
+      if (beforeId && !target) {
+        warnOnce(`mapcn: before_id "${beforeId}" not found; layer appended`);
+      }
+      for (const layer of resolvedLayers) {
+        if (map.getLayer(layer.id)) map.removeLayer(layer.id);
+        map.addLayer({ ...layer, ...(sourceId ? { source: sourceId } : {}) }, target);
+        addedLayersRef.current.push(layer.id);
+      }
+      appliedRef.current = snapshot();
+    };
+
+    const add = async () => {
+      if (ownsSource) {
+        // A leftover source means an aborted teardown or a double mount.
+        if (map.getSource(sourceId)) {
+          for (const layer of resolvedLayers) {
+            if (map.getLayer(layer.id)) map.removeLayer(layer.id);
+          }
+          map.removeSource(sourceId);
+        }
+        map.addSource(sourceId, stableSource);
+      } else if (sourceId && !map.getSource(sourceId)) {
+        // The style does not provide it (yet): skip the layer and try again
+        // when the next style finishes loading.
+        warnOnce(`mapcn: source "${sourceId}" not found`);
+        retryHandler = () => setRetryToken((token) => token + 1);
+        map.on("style.load", retryHandler);
+        return;
+      }
+
+      if (stableImages) {
+        await Promise.all(
+          Object.entries(stableImages).map(([name, url]) => loadImageInto(name, url)),
+        );
+        if (cancelled) return;
+      }
+
+      addLayers();
+    };
+
+    add();
+
+    return () => {
+      cancelled = true;
+      try {
+        if (retryHandler) map.off("style.load", retryHandler);
+        for (const layerId of [...addedLayersRef.current].reverse()) {
+          if (map.getLayer(layerId)) map.removeLayer(layerId);
+        }
+        if (ownsSource && map.getSource(sourceId)) map.removeSource(sourceId);
+        for (const name of addedImagesRef.current) {
+          if (map.hasImage(name)) map.removeImage(name);
+        }
+      } catch {
+        // The style may be mid-reload; MapLibre has already dropped these.
+      }
+      addedLayersRef.current = [];
+      addedImagesRef.current = [];
+      appliedRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, isLoaded, coldKey, retryToken]);
+
+  // Apply in place.
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+    const applied = appliedRef.current;
+    if (!applied) return;
+
+    const next = snapshot();
+
+    if (hot.has("data") && !isSame(next.data, applied.data)) {
+      map.getSource(sourceId)?.setData?.(next.data);
+    }
+
+    resolvedLayers.forEach((layer, index) => {
+      if (!map.getLayer(layer.id)) return;
+      const before = applied.layers[index] ?? {};
+      const after = next.layers[index];
+
+      if (hot.has("paint")) {
+        for (const [key, value] of Object.entries(after.paint)) {
+          if (!isSame(value, before.paint?.[key])) map.setPaintProperty(layer.id, key, value);
+        }
+      }
+      if (hot.has("layout")) {
+        for (const [key, value] of Object.entries(after.layout)) {
+          if (!isSame(value, before.layout?.[key])) map.setLayoutProperty(layer.id, key, value);
+        }
+      }
+      if (hot.has("filter") && !isSame(after.filter, before.filter)) {
+        map.setFilter(layer.id, after.filter ?? undefined);
+      }
+      if (
+        hot.has("zoomRange") &&
+        (after.minzoom !== before.minzoom || after.maxzoom !== before.maxzoom)
+      ) {
+        map.setLayerZoomRange(layer.id, after.minzoom ?? undefined, after.maxzoom ?? undefined);
+      }
+    });
+
+    if (hot.has("beforeId") && next.beforeId !== applied.beforeId) {
+      const target = resolveBeforeId(map, next.beforeId);
+      for (const layer of resolvedLayers) {
+        if (map.getLayer(layer.id)) map.moveLayer(layer.id, target);
+      }
+    }
+
+    if (hot.has("images")) {
+      const wanted = stableImages ?? {};
+      for (const name of [...addedImagesRef.current]) {
+        if (name in wanted) continue;
+        if (map.hasImage(name)) map.removeImage(name);
+        addedImagesRef.current = addedImagesRef.current.filter((entry) => entry !== name);
+      }
+      for (const [name, url] of Object.entries(wanted)) {
+        if (!addedImagesRef.current.includes(name)) loadImageInto(name, url);
+      }
+    }
+
+    appliedRef.current = next;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, isLoaded, snapshot, stableImages, hot, sourceId]);
+
+  // Interaction, bound to the first layer (the one hover paint applies to).
+  const hitLayerId = resolvedLayers[0]?.id;
+  useEffect(() => {
+    if (!map || !isLoaded || !interactive || !hitLayerId) return undefined;
+
+    let hoveredId = null;
+
+    const setHover = (next) => {
+      if (next === hoveredId) return;
+      const sourceExists = !!map.getSource(sourceId);
+      if (hoveredId != null && sourceExists) {
+        map.setFeatureState({ source: sourceId, id: hoveredId }, { hover: false });
+      }
+      hoveredId = next;
+      if (next != null && sourceExists) {
+        map.setFeatureState({ source: sourceId, id: next }, { hover: true });
+      }
+    };
+
+    const payload = (feature, event) => ({
+      feature: serializeFeature(feature),
+      longitude: event.lngLat.lng,
+      latitude: event.lngLat.lat,
+    });
+
+    const handleMouseMove = (event) => {
+      const feature = event.features?.[0];
+      if (!feature) return;
+      map.getCanvas().style.cursor = "pointer";
+      if (feature.id === hoveredId) return;
+      setHover(feature.id ?? null);
+      callbacksRef.current.onHover?.(payload(feature, event));
+    };
+
+    const handleMouseLeave = () => {
+      setHover(null);
+      map.getCanvas().style.cursor = "";
+      callbacksRef.current.onHover?.(null);
+    };
+
+    const handleClick = (event) => {
+      const feature = event.features?.[0];
+      if (!feature) return;
+      callbacksRef.current.onClick?.(payload(feature, event));
+    };
+
+    map.on("mousemove", hitLayerId, handleMouseMove);
+    map.on("mouseleave", hitLayerId, handleMouseLeave);
+    map.on("click", hitLayerId, handleClick);
+
+    return () => {
+      map.off("mousemove", hitLayerId, handleMouseMove);
+      map.off("mouseleave", hitLayerId, handleMouseLeave);
+      map.off("click", hitLayerId, handleClick);
+      setHover(null);
+      try {
+        map.getCanvas().style.cursor = "";
+      } catch {
+        // The map may already be gone.
+      }
+    };
+  }, [map, isLoaded, interactive, hitLayerId, sourceId]);
+
+  return { sourceId, layerIds: resolvedLayers.map((layer) => layer.id) };
+}
+
+// ---------------------------------------------------------------------------
 // Reflex helpers
 // ---------------------------------------------------------------------------
 
@@ -2149,6 +2487,7 @@ function MapCamera({ command }) {
 export {
   Map,
   useMap,
+  useMapLayer,
   MapMarker,
   MarkerContent,
   MarkerPopup,
