@@ -57,8 +57,8 @@ jobs:
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
-      - run: uv sync --locked --extra dev
-      - run: uv run pytest tests -q
+      - run: uv sync --locked --extra dev --python ${{ matrix.python-version }}
+      - run: uv run --python ${{ matrix.python-version }} pytest tests -q
 
   build:
     name: Build and verify package
@@ -68,6 +68,9 @@ jobs:
       - uses: astral-sh/setup-uv@v10.1.0
         with:
           enable-cache: true
+          # Must match .python-version: Python 3.13 dedents docstrings at compile
+          # time, so the generated stubs differ between interpreters.
+          python-version-file: .python-version
       - run: uv sync --locked --extra dev
 
       - name: Validate packaging metadata
@@ -84,7 +87,7 @@ jobs:
       - name: Fail if the committed type stubs are stale
         run: |
           if ! git diff --exit-code -- custom_components/reflex_mapcn/mapcn.pyi; then
-            echo "::error file=custom_components/reflex_mapcn/mapcn.pyi::Committed stubs do not match the source. Regenerate them with: PYTHONPATH=\"\$PWD\" uv run reflex component build"
+            echo "::error file=custom_components/reflex_mapcn/mapcn.pyi::Committed stubs do not match the source. Regenerate them on the Python version in .python-version with: PYTHONPATH=\"\$PWD\" uv run reflex component build"
             exit 1
           fi
 

@@ -244,6 +244,9 @@ PYTHONPATH="$PWD" uv run reflex component build   # regenerates .pyi stubs, buil
 
 The generated `custom_components/reflex_mapcn/mapcn.pyi` is committed. CI fails
 if it drifts from the source, so regenerate it whenever you change `mapcn.py`.
+Do it on the interpreter named in `.python-version`: Python 3.13 dedents
+docstrings at compile time, so stubs generated there differ from 3.12 ones.
+`uv run` picks that interpreter up automatically.
 
 Specifications live under `docs/`; read `docs/specs/constitution.md` first.
 
