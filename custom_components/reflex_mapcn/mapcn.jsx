@@ -2762,6 +2762,119 @@ function HeatmapLayer({
 }
 
 // ---------------------------------------------------------------------------
+// Circle layer (Reflex extra)
+// ---------------------------------------------------------------------------
+
+/** Component prop -> MapLibre paint property. */
+const CIRCLE_PAINT_PROPS = {
+  radius: "circle-radius",
+  color: "circle-color",
+  opacity: "circle-opacity",
+  strokeColor: "circle-stroke-color",
+  strokeWidth: "circle-stroke-width",
+  strokeOpacity: "circle-stroke-opacity",
+  blur: "circle-blur",
+  pitchScale: "circle-pitch-scale",
+};
+
+/**
+ * Thousands of points drawn by the GPU, with radius and colour driven by the
+ * data. Every paint prop takes a number, a colour or a MapLibre expression, so
+ * "radius by magnitude, colour by depth" needs no JavaScript.
+ */
+function CircleLayer({
+  id: propId,
+  data,
+  promoteId,
+  radius = 5,
+  color = "#3b82f6",
+  opacity = 0.85,
+  strokeColor = "#ffffff",
+  strokeWidth = 1,
+  strokeOpacity,
+  blur,
+  pitchScale,
+  sortKey,
+  filter,
+  minZoom,
+  maxZoom,
+  cluster = false,
+  clusterRadius = 50,
+  clusterMaxZoom = 14,
+  interactive = true,
+  hoverPaint,
+  visible = true,
+  beforeId,
+  onClick,
+  onHover,
+}) {
+  const autoId = useId();
+  const id = propId ?? autoId;
+
+  const stableData = useStableValue(data);
+  const stableFilter = useStableValue(filter);
+  const stableSortKey = useStableValue(sortKey);
+  const stableHoverPaint = useStableValue(hoverPaint);
+  const paintValues = useStableValue({
+    radius,
+    color,
+    opacity,
+    strokeColor,
+    strokeWidth,
+    strokeOpacity,
+    blur,
+    pitchScale,
+  });
+
+  const source = useMemo(
+    () => ({
+      type: "geojson",
+      data: stableData,
+      ...(promoteId ? { promoteId } : {}),
+      ...(cluster
+        ? { cluster: true, clusterRadius, clusterMaxZoom }
+        : { cluster: false }),
+    }),
+    [stableData, promoteId, cluster, clusterRadius, clusterMaxZoom],
+  );
+
+  const layers = useMemo(() => {
+    const paint = {};
+    for (const [prop, name] of Object.entries(CIRCLE_PAINT_PROPS)) {
+      if (paintValues[prop] !== undefined) paint[name] = paintValues[prop];
+    }
+    return [
+      {
+        id: `circle-layer-${id}`,
+        type: "circle",
+        paint,
+        layout: {
+          visibility: visible ? "visible" : "none",
+          // circle-sort-key is layout, not paint: it decides draw order.
+          ...(stableSortKey !== undefined ? { "circle-sort-key": stableSortKey } : {}),
+        },
+        ...(stableFilter ? { filter: stableFilter } : {}),
+        ...(minZoom !== undefined ? { minzoom: minZoom } : {}),
+        ...(maxZoom !== undefined ? { maxzoom: maxZoom } : {}),
+      },
+    ];
+  }, [id, paintValues, stableSortKey, stableFilter, visible, minZoom, maxZoom]);
+
+  useMapLayer({
+    id,
+    sourceId: `circle-source-${id}`,
+    source,
+    layers,
+    beforeId,
+    interactive,
+    hoverPaint: stableHoverPaint,
+    callbacks: { onClick, onHover },
+  });
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Reflex helpers
 // ---------------------------------------------------------------------------
 
@@ -2802,6 +2915,7 @@ export {
   RasterLayer,
   Layer,
   HeatmapLayer,
+  CircleLayer,
   MapMarker,
   MarkerContent,
   MarkerPopup,

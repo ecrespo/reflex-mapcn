@@ -358,3 +358,38 @@ def test_REQ_HEA_002_the_python_only_props_are_not_forwarded():
     assert "MapcnHeatmapLayer" in rendered
     assert "weightProperty" not in rendered
     assert "maxZoomFade" not in rendered
+
+
+def test_REQ_PNT_001_circle_layer_renders_with_data_driven_paint():
+    rendered = _render(
+        mapcn.map(
+            mapcn.map_circle_layer(
+                id="quakes",
+                data={"type": "FeatureCollection", "features": []},
+                promote_id="id",
+                radius=["interpolate", ["linear"], ["get", "mag"], 4, 4, 7, 24],
+                color=["step", ["get", "depth"], "#ef4444", 70, "#f97316"],
+                hover_paint={"circle-stroke-width": 3},
+                filter=["<=", ["get", "time"], 1690000000000],
+                on_click=_State.on_geo,
+            )
+        )
+    )
+    assert "MapcnCircleLayer" in rendered
+    assert "promoteId" in rendered
+    assert "hoverPaint" in rendered
+    assert "onClick" in rendered
+
+
+def test_REQ_PNT_001_a_circle_layer_without_data_is_rejected():
+    with pytest.raises(ValueError, match="data is required"):
+        mapcn.map_circle_layer(radius=5)
+
+
+def test_REQ_PNT_008_cluster_options_reach_the_component():
+    layer = mapcn.map_circle_layer(
+        data="/quakes.geojson", cluster=True, cluster_radius=80, cluster_max_zoom=12
+    )
+    assert _prop(layer, "cluster") == "true"
+    assert _prop(layer, "cluster_radius") == "80"
+    assert _prop(layer, "cluster_max_zoom") == "12"

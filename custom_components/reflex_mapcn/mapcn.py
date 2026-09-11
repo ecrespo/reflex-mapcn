@@ -758,6 +758,84 @@ class MapHeatmapLayer(MapcnComponent):
         return super().create(*children, **props)
 
 
+class MapCircleLayer(MapcnComponent):
+    """Point data as GPU-drawn circles (Reflex extra).
+
+    The component to reach for when there are more points than markers can
+    carry: radius and colour follow the data, and thousands of features stay
+    smooth because nothing touches the DOM::
+
+        mapcn.map_circle_layer(
+            data=State.quakes,
+            promote_id="id",
+            radius=interpolate("mag", [(4, 4), (7, 24)]),
+            color=step("depth", "#ef4444", [(70, "#f97316"), (300, "#3b82f6")]),
+            filter=State.layer_filter,
+            hover_paint={"circle-stroke-width": 3},
+            on_click=State.select_quake,
+        )
+
+    Every paint prop takes a number, a colour or a MapLibre expression.
+    ``filter`` is applied in place, which is what makes a time slider feel
+    instant: the data stays in the browser and only the filter changes.
+
+    Interactive by default, unlike ``map_layer``: a point layer is almost
+    always meant to be clicked. Set ``promote_id`` so hover state survives
+    tile boundaries.
+    """
+
+    tag = "CircleLayer"
+    alias = "MapcnCircleLayer"
+
+    data: rx.Var[dict[str, Any] | str]
+    # Feature property promoted to the feature id, for stable hover state.
+    promote_id: rx.Var[str]
+
+    # ---- paint (number, colour or expression) ----------------------------
+
+    radius: rx.Var[float | list]
+    color: rx.Var[str | list]
+    opacity: rx.Var[float | list]
+    stroke_color: rx.Var[str | list]
+    stroke_width: rx.Var[float | list]
+    stroke_opacity: rx.Var[float | list]
+    blur: rx.Var[float | list]
+    pitch_scale: rx.Var[Literal["map", "viewport"]]
+    # Draw order within the layer (layout property).
+    sort_key: rx.Var[list | float]
+
+    # ---- selection and zoom ----------------------------------------------
+
+    filter: rx.Var[list]
+    min_zoom: rx.Var[float]
+    max_zoom: rx.Var[float]
+
+    # ---- clustering (source options) -------------------------------------
+
+    cluster: rx.Var[bool]
+    cluster_radius: rx.Var[int]
+    cluster_max_zoom: rx.Var[int]
+
+    # ---- interaction ------------------------------------------------------
+
+    interactive: rx.Var[bool]
+    # Merged over the paint behind `feature-state.hover`.
+    hover_paint: rx.Var[dict[str, Any]]
+    visible: rx.Var[bool]
+    before_id: rx.Var[str]
+
+    on_click: rx.EventHandler[passthrough_event_spec(LayerFeatureEvent)]
+    # Receives the event, or None when the cursor leaves the layer.
+    on_hover: rx.EventHandler[passthrough_event_spec(LayerFeatureEvent)]
+
+    @classmethod
+    def create(cls, *children, **props) -> rx.Component:
+        """Reject a layer with nothing to draw."""
+        if props.get("data") is None:
+            raise ValueError("map_circle_layer: data is required")
+        return super().create(*children, **props)
+
+
 # ---------------------------------------------------------------------------
 # Reflex extra: imperative camera
 # ---------------------------------------------------------------------------
@@ -828,6 +906,7 @@ map_camera = MapCamera.create
 map_raster_layer = MapRasterLayer.create
 map_layer = MapLayer.create
 map_heatmap_layer = MapHeatmapLayer.create
+map_circle_layer = MapCircleLayer.create
 
 
 class MapcnNamespace(rx.ComponentNamespace):
@@ -863,6 +942,7 @@ __all__ = [
     "MapArcEvent",
     "MapCamera",
     "MapClickEvent",
+    "MapCircleLayer",
     "MapClusterLayer",
     "MapControls",
     "MapGeoJSON",
@@ -888,6 +968,7 @@ __all__ = [
     "map",
     "map_arc",
     "map_camera",
+    "map_circle_layer",
     "map_cluster_layer",
     "map_controls",
     "map_geojson",
