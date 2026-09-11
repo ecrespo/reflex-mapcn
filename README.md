@@ -1,5 +1,10 @@
 # reflex-mapcn
 
+[![CI](https://github.com/ecrespo/reflex-mapcn/actions/workflows/ci.yml/badge.svg)](https://github.com/ecrespo/reflex-mapcn/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/reflex-mapcn.svg)](https://pypi.org/project/reflex-mapcn/)
+[![Python versions](https://img.shields.io/pypi/pyversions/reflex-mapcn.svg)](https://pypi.org/project/reflex-mapcn/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 [mapcn](https://www.mapcn.dev) map components for [Reflex](https://reflex.dev).
 
 mapcn is a set of beautifully designed, MapLibre GL powered map components
@@ -231,9 +236,46 @@ Venezuela map (OpenFreeMap street-level basemap, state polygons served from
 ## Development
 
 ```bash
-uv venv && uv pip install -e ".[dev]"
-uv run reflex component build    # generates .pyi stubs + builds dist/
+uv sync --extra dev
+uv run pytest tests
+uv run ruff check . && uv run ruff format --check .
+PYTHONPATH="$PWD" uv run reflex component build   # regenerates .pyi stubs, builds dist/
 ```
+
+The generated `custom_components/reflex_mapcn/mapcn.pyi` is committed. CI fails
+if it drifts from the source, so regenerate it whenever you change `mapcn.py`.
+
+Specifications live under `docs/`; read `docs/specs/constitution.md` first.
+
+### Checks that run on every push and pull request
+
+`ci.yml` gates `develop` and `main` with ruff, byte-compilation, the test suite
+on Python 3.10 through 3.13, and a package build that rejects stale stubs or
+invalid trove classifiers and then installs the wheel in a clean environment.
+Alongside those it runs gitleaks over the full history, bandit, semgrep,
+pip-audit over the locked runtime dependencies, and a trivy filesystem scan.
+CodeQL analyses Python and JavaScript in a separate workflow.
+
+Run the same gates locally before pushing:
+
+```bash
+uv run --with trove-classifiers python scripts/check_metadata.py
+uv run --no-project --with 'bandit[toml]' bandit -c pyproject.toml -r . --severity-level medium
+uv run --no-project --with pip-audit pip-audit -r <(uv export --no-emit-project --format requirements-txt)
+gitleaks detect --source . --redact --no-banner
+```
+
+### Cutting a release
+
+1. Bump `version` in `pyproject.toml` and add the entry to `CHANGELOG.md`.
+2. Merge to `main` through a pull request, so the full gate runs.
+3. Tag and push: `git tag -a vX.Y.Z -m "reflex-mapcn X.Y.Z" && git push origin vX.Y.Z`.
+
+`release.yml` takes it from there. It checks that the tag matches the declared
+version, that its commit is on `main` and that the version is not already on
+PyPI, re-runs the whole gate, publishes through PyPI trusted publishing, and
+attaches the artifacts to the GitHub release. No API token is stored in the
+repository.
 
 ## Credits
 

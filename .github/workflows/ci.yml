@@ -1,0 +1,242 @@
+name: CI
+
+# Gate for everything that lands on develop and for every promotion to main.
+# `release.yml` calls this same workflow, so a tag can only be published after
+# the exact commit being released has passed all of these checks.
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Never resolve past uv.lock: a dependency bump has to be a deliberate commit.
+  UV_FROZEN: "1"
+  FORCE_COLOR: "1"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --extra dev
+      - name: ruff check
+        run: uv run ruff check --output-format=github .
+      - name: ruff format
+        run: uv run ruff format --check .
+      - name: Byte-compile every source file
+        # Article 6 of docs/specs/constitution.md. Catches syntax errors in the
+        # demo app, which the test suite does not import.
+        run: uv run python -m compileall -q custom_components mapcn_demo/mapcn_demo mapcn_demo/rxconfig.py scripts tests
+
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every version pyproject.toml claims to support.
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+      - run: uv sync --locked --extra dev
+      - run: uv run pytest tests -q
+
+  build:
+    name: Build and verify package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --extra dev
+
+      - name: Validate packaging metadata
+        # PyPI rejects unknown trove classifiers with a 400 that `twine check`
+        # cannot see, so catch it here rather than at upload time.
+        run: uv run --with trove-classifiers python scripts/check_metadata.py
+
+      - name: Build the package and regenerate type stubs
+        # The stub generator imports the component through its repository path.
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: uv run reflex component build
+
+      - name: Fail if the committed type stubs are stale
+        run: |
+          if ! git diff --exit-code -- custom_components/reflex_mapcn/mapcn.pyi; then
+            echo "::error file=custom_components/reflex_mapcn/mapcn.pyi::Committed stubs do not match the source. Regenerate them with: PYTHONPATH=\"\$PWD\" uv run reflex component build"
+            exit 1
+          fi
+
+      - name: Check distribution metadata renders
+        run: uv run twine check dist/*
+
+      - name: Install the wheel in a clean environment and smoke-test it
+        # Proves the wheel carries the React module, the stylesheet and the
+        # stubs, which is the failure mode a source-tree test cannot catch.
+        run: |
+          uv venv /tmp/smoke --python 3.12
+          uv pip install --python /tmp/smoke/bin/python --no-cache dist/*.whl
+          /tmp/smoke/bin/python - <<'PY'
+          import importlib.resources as resources
+
+          import reflex_mapcn as mapcn
+
+          bundled = {path.name for path in resources.files("reflex_mapcn").iterdir()}
+          for required in ("mapcn.jsx", "mapcn.css", "mapcn.pyi", "py.typed"):
+              assert required in bundled, f"{required} missing from the wheel"
+
+          rendered = str(
+              mapcn.map(
+                  mapcn.map_controls(position="top-right"),
+                  mapcn.map_marker(
+                      mapcn.marker_content(), longitude=-66.9036, latitude=10.4806
+                  ),
+                  center=[-66.9036, 10.4806],
+                  zoom=11,
+              ).render()
+          )
+          assert "MapcnMap" in rendered and "MapcnMapMarker" in rendered
+          print("wheel smoke test passed")
+          PY
+
+      - name: Upload the distributions
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # gitleaks scans history, not just the tip, so a secret that was
+          # committed and later removed is still caught.
+          fetch-depth: 0
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+      - name: Scan the working tree and full history
+        run: gitleaks detect --source . --redact --no-banner --report-format sarif --report-path gitleaks.sarif
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gitleaks-report
+          path: gitleaks.sarif
+          if-no-files-found: ignore
+          retention-days: 7
+
+  sast:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+
+      - name: bandit
+        # Medium and above fails the build. Exclusions live in pyproject.toml.
+        run: >
+          uv run --no-project --with 'bandit[toml]>=1.9,<2'
+          bandit -c pyproject.toml -r . --severity-level medium
+
+      - name: semgrep
+        # Covers the vendored React module as well as the Python sources.
+        run: >
+          uv run --no-project --with 'semgrep>=1.177,<2'
+          semgrep scan
+          --config=p/python
+          --config=p/javascript
+          --config=p/secrets
+          --config=p/owasp-top-ten
+          --severity=ERROR
+          --error
+          --metrics=off
+          --sarif-output=semgrep.sarif
+          .
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: semgrep-report
+          path: semgrep.sarif
+          if-no-files-found: ignore
+          retention-days: 7
+
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+
+      - name: Export the locked runtime dependencies
+        # Audits what a user actually installs, not the development tooling.
+        run: uv export --locked --no-emit-project --format requirements-txt -o requirements-lock.txt
+
+      - name: pip-audit
+        run: >
+          uv run --no-project --with 'pip-audit>=2.10,<3'
+          pip-audit --requirement requirements-lock.txt --progress-spinner off
+
+      - name: trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          skip-dirs: .venv,mapcn_demo/.web,mapcn_demo/.states
+
+  gate:
+    # Single check to require in the branch protection rules for develop and
+    # main. Adding a job above needs no protection change, only a `needs` entry.
+    name: All checks passed
+    if: always()
+    needs: [lint, test, build, secrets, sast, dependencies]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify every job succeeded
+        run: |
+          echo "results: ${{ join(needs.*.result, ', ') }}"
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]] \
+            || [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "::error::One or more checks failed."
+            exit 1
+          fi
+          echo "All checks passed."

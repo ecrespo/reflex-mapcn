@@ -1,0 +1,16 @@
+version: 2
+
+# Only the GitHub Actions ecosystem is enabled. Python dependencies are pinned
+# by uv.lock, which Dependabot would leave stale while editing pyproject.toml,
+# and that combination breaks the `uv sync --locked` step in CI. Their known
+# vulnerabilities are already caught by the pip-audit and trivy jobs there.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies
