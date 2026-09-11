@@ -81,7 +81,7 @@
 - **Depende de:** T-008
 - **Done:** tests; benchmark manual 10k puntos anotado en el registro de ejecución (fps observados).
 
-### T-011 · `map_symbol_layer` + `Map.glyphs_url`
+### T-011 · `map_symbol_layer` + `Map.glyphs_url` — `[x] 2026-09-11`
 - **Qué:** `SymbolLayer` JSX (layout/paint `icon-*`/`text-*`, `images` con tolerancia a fallo de carga), detección de glyphs (`map.getStyle().glyphs`) ⇒ omitir `text-field` + warn; `Map` acepta `glyphsUrl` y lo inyecta en `blankMapStyle`; `MapSymbolLayer` Python.
 - **REQ:** REQ-PNT-002, 003, 004, 005, 006, 009, 010
 - **Depende de:** T-010
@@ -225,6 +225,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-11 | T-011 | OK | TDD: 2 tests de pytest y 6 en Chromium (mapeo de icono y texto a layout y paint, inyección de `glyphs` en el estilo transparente en sus dos formas de URL, texto sin tipografías que avisa y omite solo la etiqueta, imágenes antes de la capa y retiradas al desmontar, interactividad por defecto). `Map` gana `glyphs_url`, que es aditivo y no cambia ninguna firma de 0.1.0. 60 tests Python y 48 JSX en verde. |
 | 2026-09-11 | T-010 | OK | TDD: 3 tests de pytest y 7 en Chromium (ids y `promote_id`, defaults, mapeo completo de pintura con `circle-sort-key` en layout y no en paint, filtro en caliente, interactividad por defecto y su desactivación, opciones de agrupación que reconstruyen la fuente). El benchmark de 10 000 puntos (REQ-PNT-007) no se puede medir contra el MapLibre simulado: queda para T-020 con `reflex run`. 58 tests Python y 42 JSX en verde. |
 | 2026-09-11 | T-009 | OK | TDD: 7 tests de pytest (las dos expresiones generadas, precedencia de la prop explícita, validación) y 5 en Chromium (defaults, mapeo de pintura, caliente, estilo y limpieza). Un test JSX falló por un índice mal contado en la rampa de color y se corrigió el test, no el componente. Anotado un conflicto de spec para T-017: REQ-SIS-008 pide un mapa de calor filtrado, pero el API Spec no da prop `filter` al heatmap y DD-006 prohíbe reenviar los datos; se resolverá con un Delta. 55 tests Python y 35 JSX en verde. |
 | 2026-09-11 | T-008 | OK | TDD: 6 tests de pytest (validación temprana y props) y 5 en Chromium (fuente por diccionario, fuente del estilo por id que solo añade la capa y no se borra al desmontar, fusión de pintura de hover, visibilidad, id de fuente inexistente). Se aplica de paso el hallazgo A-09: `LayerFeatureEvent` se exporta como alias de `MapGeoJSONEvent`. 48 tests Python y 30 JSX en verde. |

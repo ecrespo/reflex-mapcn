@@ -72,6 +72,18 @@ const blankMapStyle = {
   ],
 };
 
+/**
+ * Build the `glyphs` entry of a style from a font server url.
+ *
+ * Both spellings are accepted: a base url, or one that already carries the
+ * `{fontstack}` and `{range}` placeholders.
+ */
+function glyphsTemplate(url) {
+  if (!url) return undefined;
+  if (url.includes("{fontstack}")) return url;
+  return `${url.replace(/\/$/, "")}/{fontstack}/{range}.pbf`;
+}
+
 // Prevent equivalent inline objects from triggering effects / style reloads.
 function useStableValue(value) {
   const key = useMemo(() => JSON.stringify(value) ?? "", [value]);
@@ -221,6 +233,7 @@ const Map = forwardRef(function Map(
     theme: themeProp,
     styles,
     blank = false,
+    glyphsUrl,
     projection,
     viewport,
     onViewportChange,
@@ -260,9 +273,14 @@ const Map = forwardRef(function Map(
         light: stableStyles.light ?? defaultStyles.light,
       };
     }
-    if (blank) return { dark: blankMapStyle, light: blankMapStyle };
+    if (blank) {
+      const style = glyphsUrl
+        ? { ...blankMapStyle, glyphs: glyphsTemplate(glyphsUrl) }
+        : blankMapStyle;
+      return { dark: style, light: style };
+    }
     return defaultStyles;
-  }, [stableStyles, blank]);
+  }, [stableStyles, blank, glyphsUrl]);
 
   useImperativeHandle(ref, () => mapInstance, [mapInstance]);
 
@@ -2875,6 +2893,188 @@ function CircleLayer({
 }
 
 // ---------------------------------------------------------------------------
+// Symbol layer (Reflex extra)
+// ---------------------------------------------------------------------------
+
+/** Component prop -> MapLibre layout property. */
+const SYMBOL_LAYOUT_PROPS = {
+  iconImage: "icon-image",
+  iconSize: "icon-size",
+  iconAnchor: "icon-anchor",
+  iconOffset: "icon-offset",
+  iconRotate: "icon-rotate",
+  iconAllowOverlap: "icon-allow-overlap",
+  textFont: "text-font",
+  textSize: "text-size",
+  textOffset: "text-offset",
+  textAnchor: "text-anchor",
+  textAllowOverlap: "text-allow-overlap",
+  textOptional: "text-optional",
+};
+
+/** Component prop -> MapLibre paint property. */
+const SYMBOL_PAINT_PROPS = {
+  iconOpacity: "icon-opacity",
+  textColor: "text-color",
+  textOpacity: "text-opacity",
+  textHaloColor: "text-halo-color",
+  textHaloWidth: "text-halo-width",
+};
+
+/**
+ * Icons and labels on point data.
+ *
+ * Labels need the style to declare where its fonts come from. The blank
+ * basemap does not, so asking for a label there would take the whole map down:
+ * the label is dropped with a warning instead, and `glyphs_url` on `Map` is
+ * the way to get it back.
+ */
+function SymbolLayer({
+  id: propId,
+  data,
+  promoteId,
+  images,
+  iconImage,
+  iconSize,
+  iconAnchor,
+  iconOffset,
+  iconRotate,
+  iconAllowOverlap,
+  iconOpacity,
+  textField,
+  textFont = ["Noto Sans Regular"],
+  textSize,
+  textOffset,
+  textAnchor,
+  textColor,
+  textOpacity,
+  textHaloColor,
+  textHaloWidth,
+  textAllowOverlap,
+  textOptional,
+  filter,
+  minZoom,
+  maxZoom,
+  interactive = true,
+  hoverPaint,
+  visible = true,
+  beforeId,
+  onClick,
+  onHover,
+}) {
+  const { map, isLoaded } = useMap();
+  const autoId = useId();
+  const id = propId ?? autoId;
+
+  const stableData = useStableValue(data);
+  const stableImages = useStableValue(images);
+  const stableFilter = useStableValue(filter);
+  const stableTextField = useStableValue(textField);
+  const stableHoverPaint = useStableValue(hoverPaint);
+  const layoutValues = useStableValue({
+    iconImage,
+    iconSize,
+    iconAnchor,
+    iconOffset,
+    iconRotate,
+    iconAllowOverlap,
+    textFont,
+    textSize,
+    textOffset,
+    textAnchor,
+    textAllowOverlap,
+    textOptional,
+  });
+  const paintValues = useStableValue({
+    iconOpacity,
+    textColor,
+    textOpacity,
+    textHaloColor,
+    textHaloWidth,
+  });
+
+  // Only the active style knows whether it can render text at all.
+  const hasGlyphs = useMemo(() => {
+    if (!map || !isLoaded) return false;
+    try {
+      return !!map.getStyle()?.glyphs;
+    } catch {
+      return false;
+    }
+  }, [map, isLoaded]);
+
+  const wantsText = stableTextField !== undefined && stableTextField !== null;
+  const dropsText = wantsText && !hasGlyphs;
+
+  const warnedRef = useRef(false);
+  useEffect(() => {
+    if (!isLoaded || !dropsText || warnedRef.current) return;
+    warnedRef.current = true;
+    console.warn("mapcn: symbol text needs style glyphs; pass glyphs_url to Map");
+  }, [isLoaded, dropsText]);
+
+  const source = useMemo(
+    () => ({
+      type: "geojson",
+      data: stableData,
+      ...(promoteId ? { promoteId } : {}),
+    }),
+    [stableData, promoteId],
+  );
+
+  const layers = useMemo(() => {
+    const layout = { visibility: visible ? "visible" : "none" };
+    for (const [prop, name] of Object.entries(SYMBOL_LAYOUT_PROPS)) {
+      if (layoutValues[prop] !== undefined) layout[name] = layoutValues[prop];
+    }
+    if (wantsText && !dropsText) layout["text-field"] = stableTextField;
+    else delete layout["text-font"];
+
+    const paint = {};
+    for (const [prop, name] of Object.entries(SYMBOL_PAINT_PROPS)) {
+      if (paintValues[prop] !== undefined) paint[name] = paintValues[prop];
+    }
+
+    return [
+      {
+        id: `symbol-layer-${id}`,
+        type: "symbol",
+        layout,
+        paint,
+        ...(stableFilter ? { filter: stableFilter } : {}),
+        ...(minZoom !== undefined ? { minzoom: minZoom } : {}),
+        ...(maxZoom !== undefined ? { maxzoom: maxZoom } : {}),
+      },
+    ];
+  }, [
+    id,
+    layoutValues,
+    paintValues,
+    stableTextField,
+    wantsText,
+    dropsText,
+    stableFilter,
+    visible,
+    minZoom,
+    maxZoom,
+  ]);
+
+  useMapLayer({
+    id,
+    sourceId: `symbol-source-${id}`,
+    source,
+    layers,
+    images: stableImages,
+    beforeId,
+    interactive,
+    hoverPaint: stableHoverPaint,
+    callbacks: { onClick, onHover },
+  });
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Reflex helpers
 // ---------------------------------------------------------------------------
 
@@ -2916,6 +3116,7 @@ export {
   Layer,
   HeatmapLayer,
   CircleLayer,
+  SymbolLayer,
   MapMarker,
   MarkerContent,
   MarkerPopup,

@@ -393,3 +393,32 @@ def test_REQ_PNT_008_cluster_options_reach_the_component():
     assert _prop(layer, "cluster") == "true"
     assert _prop(layer, "cluster_radius") == "80"
     assert _prop(layer, "cluster_max_zoom") == "12"
+
+
+def test_REQ_PNT_002_symbol_layer_renders_icons_and_text():
+    rendered = _render(
+        mapcn.map(
+            mapcn.map_symbol_layer(
+                id="cities",
+                data={"type": "FeatureCollection", "features": []},
+                images={"pin": "/pin.png"},
+                icon_image="pin",
+                icon_size=1.2,
+                icon_allow_overlap=True,
+                text_field=["get", "name"],
+                text_size=12,
+                text_color="#111827",
+                on_click=_State.on_geo,
+            ),
+            glyphs_url="https://tiles.openfreemap.org/fonts",
+        )
+    )
+    assert "MapcnSymbolLayer" in rendered
+    assert "iconImage" in rendered
+    assert "textField" in rendered
+    assert "glyphsUrl" in rendered
+
+
+def test_REQ_PNT_002_a_symbol_layer_without_data_is_rejected():
+    with pytest.raises(ValueError, match="data is required"):
+        mapcn.map_symbol_layer(icon_image="pin")

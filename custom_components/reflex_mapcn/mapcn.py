@@ -240,6 +240,11 @@ class Map(MapcnComponent):
     # URL of the MapLibre web worker (defaults to unpkg CDN).
     worker_url: rx.Var[str]
 
+    # Font server for `map_symbol_layer` text on the blank basemap, e.g.
+    # "https://tiles.openfreemap.org/fonts". A url that already carries the
+    # {fontstack} and {range} placeholders is used as it is.
+    glyphs_url: rx.Var[str]
+
     # ---- Events ----------------------------------------------------------
 
     # Fires continuously while the map moves (pan/zoom/rotate/pitch).
@@ -836,6 +841,86 @@ class MapCircleLayer(MapcnComponent):
         return super().create(*children, **props)
 
 
+class MapSymbolLayer(MapcnComponent):
+    """Icons and labels on point data (Reflex extra).
+
+    ::
+
+        mapcn.map_symbol_layer(
+            data=State.cities,
+            images={"pin": "/pin.png"},
+            icon_image="pin",
+            icon_allow_overlap=True,
+            text_field=["get", "name"],
+            text_offset=[0, 1.2],
+        )
+
+    ``images`` is loaded into the map before the layer is added and removed
+    with it; an image that fails to load is reported and skipped, and the rest
+    of the layer is drawn.
+
+    Labels need the style to declare where its fonts come from. The blank
+    basemap does not, so a label there is dropped with a console warning
+    instead of taking the map down: pass ``glyphs_url`` to ``map`` to get it
+    back. ``text_font`` must exist in those glyphs; OpenFreeMap serves
+    ``Noto Sans Regular`` (the default) and CARTO serves ``Open Sans Regular``.
+    """
+
+    tag = "SymbolLayer"
+    alias = "MapcnSymbolLayer"
+
+    data: rx.Var[dict[str, Any] | str]
+    promote_id: rx.Var[str]
+    # {"name": url or data URI}: loaded with the layer, removed with it.
+    images: rx.Var[dict[str, str]]
+
+    # ---- icon -------------------------------------------------------------
+
+    icon_image: rx.Var[str | list]
+    icon_size: rx.Var[float | list]
+    icon_anchor: rx.Var[str]
+    icon_offset: rx.Var[list[float]]
+    icon_rotate: rx.Var[float | list]
+    icon_allow_overlap: rx.Var[bool]
+    icon_opacity: rx.Var[float | list]
+
+    # ---- text -------------------------------------------------------------
+
+    text_field: rx.Var[str | list]
+    # Must exist in the glyphs of the active style.
+    text_font: rx.Var[list[str]]
+    text_size: rx.Var[float | list]
+    text_offset: rx.Var[list[float]]
+    text_anchor: rx.Var[str]
+    text_color: rx.Var[str | list]
+    text_opacity: rx.Var[float | list]
+    text_halo_color: rx.Var[str]
+    text_halo_width: rx.Var[float]
+    text_allow_overlap: rx.Var[bool]
+    text_optional: rx.Var[bool]
+
+    # ---- selection and interaction ---------------------------------------
+
+    filter: rx.Var[list]
+    min_zoom: rx.Var[float]
+    max_zoom: rx.Var[float]
+    interactive: rx.Var[bool]
+    hover_paint: rx.Var[dict[str, Any]]
+    visible: rx.Var[bool]
+    before_id: rx.Var[str]
+
+    on_click: rx.EventHandler[passthrough_event_spec(LayerFeatureEvent)]
+    # Receives the event, or None when the cursor leaves the layer.
+    on_hover: rx.EventHandler[passthrough_event_spec(LayerFeatureEvent)]
+
+    @classmethod
+    def create(cls, *children, **props) -> rx.Component:
+        """Reject a layer with nothing to draw."""
+        if props.get("data") is None:
+            raise ValueError("map_symbol_layer: data is required")
+        return super().create(*children, **props)
+
+
 # ---------------------------------------------------------------------------
 # Reflex extra: imperative camera
 # ---------------------------------------------------------------------------
@@ -907,6 +992,7 @@ map_raster_layer = MapRasterLayer.create
 map_layer = MapLayer.create
 map_heatmap_layer = MapHeatmapLayer.create
 map_circle_layer = MapCircleLayer.create
+map_symbol_layer = MapSymbolLayer.create
 
 
 class MapcnNamespace(rx.ComponentNamespace):
@@ -955,6 +1041,7 @@ __all__ = [
     "MapLayer",
     "MapRasterLayer",
     "MapRoute",
+    "MapSymbolLayer",
     "MapViewport",
     "MapcnComponent",
     "MapcnNamespace",
@@ -978,6 +1065,7 @@ __all__ = [
     "map_layer",
     "map_raster_layer",
     "map_route",
+    "map_symbol_layer",
     "mapcn",
     "marker_content",
     "marker_label",
