@@ -52,6 +52,8 @@ class MapGeoJSONEvent(TypedDict):
     longitude: float
     latitude: float
 
+LayerFeatureEvent = MapGeoJSONEvent
+
 class MapArcEvent(TypedDict):
     arc: dict[str, Any]
     longitude: float
@@ -165,6 +167,7 @@ class Map(MapcnComponent):
         | None = None,
         locale: Var[dict[str, str]] | dict[str, str] | None = None,
         worker_url: Var[str] | str | None = None,
+        glyphs_url: Var[str] | str | None = None,
         style: Sequence[Mapping[str, Any]]
         | Mapping[str, Any]
         | Var[Mapping[str, Any]]
@@ -233,6 +236,7 @@ class Map(MapcnComponent):
             attribution_control: no description
             locale: no description
             worker_url: URL of the MapLibre web worker (defaults to unpkg CDN).
+            glyphs_url: Font server for `map_symbol_layer` text on the blank basemap, e.g. "https://tiles.openfreemap.org/fonts". A url that already carries the {fontstack} and {range} placeholders is used as it is.
             style: The style of the component.
             key: A unique key for the component.
             id: The id for the component.
@@ -1395,6 +1399,332 @@ class MapClusterLayer(MapcnComponent):
         """
         ...
 
+class RasterLoadError(TypedDict):
+    source_id: str
+    message: str
+
+class MapRasterLayer(MapcnComponent):
+    @classmethod
+    def create(
+        cls,
+        *children,
+        tiles: Var[list[str]] | list[str] | None = None,
+        url: Var[str] | str | None = None,
+        tile_size: Literal[256, 512] | Var[Literal[256, 512]] | None = None,
+        scheme: Literal["tms", "xyz"] | Var[Literal["tms", "xyz"]] | None = None,
+        min_zoom: Var[int] | int | None = None,
+        max_zoom: Var[int] | int | None = None,
+        bounds: Var[list[float]] | list[float] | None = None,
+        attribution: Var[str] | str | None = None,
+        opacity: Var[float] | float | None = None,
+        resampling: Literal["linear", "nearest"]
+        | Var[Literal["linear", "nearest"]]
+        | None = None,
+        saturation: Var[float] | float | None = None,
+        contrast: Var[float] | float | None = None,
+        brightness_min: Var[float] | float | None = None,
+        brightness_max: Var[float] | float | None = None,
+        hue_rotate: Var[float] | float | None = None,
+        fade_duration: Var[int] | int | None = None,
+        visible: Var[bool] | bool | None = None,
+        before_id: Var[str] | str | None = None,
+        style: Sequence[Mapping[str, Any]]
+        | Mapping[str, Any]
+        | Var[Mapping[str, Any]]
+        | Breakpoints
+        | None = None,
+        key: Any | None = None,
+        id: Any | None = None,
+        ref: Var | None = None,
+        class_name: Any | None = None,
+        custom_attrs: dict[str, Any | Var] | None = None,
+        on_blur: EventType[()] | None = None,
+        on_click: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_context_menu: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_double_click: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_focus: EventType[()] | None = None,
+        on_load_error: EventType[()] | EventType[RasterLoadError] | None = None,
+        on_mount: EventType[()] | None = None,
+        on_mouse_down: EventType[()] | None = None,
+        on_mouse_enter: EventType[()] | None = None,
+        on_mouse_leave: EventType[()] | None = None,
+        on_mouse_move: EventType[()] | None = None,
+        on_mouse_out: EventType[()] | None = None,
+        on_mouse_over: EventType[()] | None = None,
+        on_mouse_up: EventType[()] | None = None,
+        on_scroll: EventType[()] | None = None,
+        on_scroll_end: EventType[()] | None = None,
+        on_unmount: EventType[()] | None = None,
+        **props,
+    ) -> MapRasterLayer:
+        """Resolve the preset and reject a layer with nothing to render."""
+        ...
+
+class MapLayer(MapcnComponent):
+    @classmethod
+    def create(
+        cls,
+        *children,
+        source: Var[dict[str, Any] | str] | dict[str, Any] | str | None = None,
+        layer: Var[dict[str, Any]] | dict[str, Any] | None = None,
+        before_id: Var[str] | str | None = None,
+        interactive: Var[bool] | bool | None = None,
+        hover_paint: Var[dict[str, Any]] | dict[str, Any] | None = None,
+        visible: Var[bool] | bool | None = None,
+        style: Sequence[Mapping[str, Any]]
+        | Mapping[str, Any]
+        | Var[Mapping[str, Any]]
+        | Breakpoints
+        | None = None,
+        key: Any | None = None,
+        id: Any | None = None,
+        ref: Var | None = None,
+        class_name: Any | None = None,
+        custom_attrs: dict[str, Any | Var] | None = None,
+        on_blur: EventType[()] | None = None,
+        on_click: EventType[()] | EventType[MapGeoJSONEvent] | None = None,
+        on_context_menu: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_double_click: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_focus: EventType[()] | None = None,
+        on_hover: EventType[()] | EventType[MapGeoJSONEvent] | None = None,
+        on_mount: EventType[()] | None = None,
+        on_mouse_down: EventType[()] | None = None,
+        on_mouse_enter: EventType[()] | None = None,
+        on_mouse_leave: EventType[()] | None = None,
+        on_mouse_move: EventType[()] | None = None,
+        on_mouse_out: EventType[()] | None = None,
+        on_mouse_over: EventType[()] | None = None,
+        on_mouse_up: EventType[()] | None = None,
+        on_scroll: EventType[()] | None = None,
+        on_scroll_end: EventType[()] | None = None,
+        on_unmount: EventType[()] | None = None,
+        **props,
+    ) -> MapLayer:
+        """Reject a layer MapLibre would refuse, before the app compiles."""
+        ...
+
+class MapHeatmapLayer(MapcnComponent):
+    @classmethod
+    def create(
+        cls,
+        *children,
+        data: Var[dict[str, Any] | str] | dict[str, Any] | str | None = None,
+        weight: Var[float | list] | float | list | None = None,
+        intensity: Var[float | list] | float | list | None = None,
+        radius: Var[float | list] | float | list | None = None,
+        color: Var[list] | list | None = None,
+        opacity: Var[float | list] | float | list | None = None,
+        visible: Var[bool] | bool | None = None,
+        before_id: Var[str] | str | None = None,
+        min_zoom: Var[float] | float | None = None,
+        max_zoom: Var[float] | float | None = None,
+        style: Sequence[Mapping[str, Any]]
+        | Mapping[str, Any]
+        | Var[Mapping[str, Any]]
+        | Breakpoints
+        | None = None,
+        key: Any | None = None,
+        id: Any | None = None,
+        ref: Var | None = None,
+        class_name: Any | None = None,
+        custom_attrs: dict[str, Any | Var] | None = None,
+        on_blur: EventType[()] | None = None,
+        on_click: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_context_menu: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_double_click: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_focus: EventType[()] | None = None,
+        on_mount: EventType[()] | None = None,
+        on_mouse_down: EventType[()] | None = None,
+        on_mouse_enter: EventType[()] | None = None,
+        on_mouse_leave: EventType[()] | None = None,
+        on_mouse_move: EventType[()] | None = None,
+        on_mouse_out: EventType[()] | None = None,
+        on_mouse_over: EventType[()] | None = None,
+        on_mouse_up: EventType[()] | None = None,
+        on_scroll: EventType[()] | None = None,
+        on_scroll_end: EventType[()] | None = None,
+        on_unmount: EventType[()] | None = None,
+        **props,
+    ) -> MapHeatmapLayer:
+        """Turn the two Python-only shortcuts into MapLibre expressions."""
+        ...
+
+class MapCircleLayer(MapcnComponent):
+    @classmethod
+    def create(
+        cls,
+        *children,
+        data: Var[dict[str, Any] | str] | dict[str, Any] | str | None = None,
+        promote_id: Var[str] | str | None = None,
+        radius: Var[float | list] | float | list | None = None,
+        color: Var[list | str] | list | str | None = None,
+        opacity: Var[float | list] | float | list | None = None,
+        stroke_color: Var[list | str] | list | str | None = None,
+        stroke_width: Var[float | list] | float | list | None = None,
+        stroke_opacity: Var[float | list] | float | list | None = None,
+        blur: Var[float | list] | float | list | None = None,
+        pitch_scale: Literal["map", "viewport"]
+        | Var[Literal["map", "viewport"]]
+        | None = None,
+        sort_key: Var[float | list] | float | list | None = None,
+        filter: Var[list] | list | None = None,
+        min_zoom: Var[float] | float | None = None,
+        max_zoom: Var[float] | float | None = None,
+        cluster: Var[bool] | bool | None = None,
+        cluster_radius: Var[int] | int | None = None,
+        cluster_max_zoom: Var[int] | int | None = None,
+        interactive: Var[bool] | bool | None = None,
+        hover_paint: Var[dict[str, Any]] | dict[str, Any] | None = None,
+        visible: Var[bool] | bool | None = None,
+        before_id: Var[str] | str | None = None,
+        style: Sequence[Mapping[str, Any]]
+        | Mapping[str, Any]
+        | Var[Mapping[str, Any]]
+        | Breakpoints
+        | None = None,
+        key: Any | None = None,
+        id: Any | None = None,
+        ref: Var | None = None,
+        class_name: Any | None = None,
+        custom_attrs: dict[str, Any | Var] | None = None,
+        on_blur: EventType[()] | None = None,
+        on_click: EventType[()] | EventType[MapGeoJSONEvent] | None = None,
+        on_context_menu: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_double_click: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_focus: EventType[()] | None = None,
+        on_hover: EventType[()] | EventType[MapGeoJSONEvent] | None = None,
+        on_mount: EventType[()] | None = None,
+        on_mouse_down: EventType[()] | None = None,
+        on_mouse_enter: EventType[()] | None = None,
+        on_mouse_leave: EventType[()] | None = None,
+        on_mouse_move: EventType[()] | None = None,
+        on_mouse_out: EventType[()] | None = None,
+        on_mouse_over: EventType[()] | None = None,
+        on_mouse_up: EventType[()] | None = None,
+        on_scroll: EventType[()] | None = None,
+        on_scroll_end: EventType[()] | None = None,
+        on_unmount: EventType[()] | None = None,
+        **props,
+    ) -> MapCircleLayer:
+        """Reject a layer with nothing to draw."""
+        ...
+
+class MapSymbolLayer(MapcnComponent):
+    @classmethod
+    def create(
+        cls,
+        *children,
+        data: Var[dict[str, Any] | str] | dict[str, Any] | str | None = None,
+        promote_id: Var[str] | str | None = None,
+        images: Var[dict[str, str]] | dict[str, str] | None = None,
+        icon_image: Var[list | str] | list | str | None = None,
+        icon_size: Var[float | list] | float | list | None = None,
+        icon_anchor: Var[str] | str | None = None,
+        icon_offset: Var[list[float]] | list[float] | None = None,
+        icon_rotate: Var[float | list] | float | list | None = None,
+        icon_allow_overlap: Var[bool] | bool | None = None,
+        icon_opacity: Var[float | list] | float | list | None = None,
+        text_field: Var[list | str] | list | str | None = None,
+        text_font: Var[list[str]] | list[str] | None = None,
+        text_size: Var[float | list] | float | list | None = None,
+        text_offset: Var[list[float]] | list[float] | None = None,
+        text_anchor: Var[str] | str | None = None,
+        text_color: Var[list | str] | list | str | None = None,
+        text_opacity: Var[float | list] | float | list | None = None,
+        text_halo_color: Var[str] | str | None = None,
+        text_halo_width: Var[float] | float | None = None,
+        text_allow_overlap: Var[bool] | bool | None = None,
+        text_optional: Var[bool] | bool | None = None,
+        filter: Var[list] | list | None = None,
+        min_zoom: Var[float] | float | None = None,
+        max_zoom: Var[float] | float | None = None,
+        interactive: Var[bool] | bool | None = None,
+        hover_paint: Var[dict[str, Any]] | dict[str, Any] | None = None,
+        visible: Var[bool] | bool | None = None,
+        before_id: Var[str] | str | None = None,
+        style: Sequence[Mapping[str, Any]]
+        | Mapping[str, Any]
+        | Var[Mapping[str, Any]]
+        | Breakpoints
+        | None = None,
+        key: Any | None = None,
+        id: Any | None = None,
+        ref: Var | None = None,
+        class_name: Any | None = None,
+        custom_attrs: dict[str, Any | Var] | None = None,
+        on_blur: EventType[()] | None = None,
+        on_click: EventType[()] | EventType[MapGeoJSONEvent] | None = None,
+        on_context_menu: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_double_click: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_focus: EventType[()] | None = None,
+        on_hover: EventType[()] | EventType[MapGeoJSONEvent] | None = None,
+        on_mount: EventType[()] | None = None,
+        on_mouse_down: EventType[()] | None = None,
+        on_mouse_enter: EventType[()] | None = None,
+        on_mouse_leave: EventType[()] | None = None,
+        on_mouse_move: EventType[()] | None = None,
+        on_mouse_out: EventType[()] | None = None,
+        on_mouse_over: EventType[()] | None = None,
+        on_mouse_up: EventType[()] | None = None,
+        on_scroll: EventType[()] | None = None,
+        on_scroll_end: EventType[()] | None = None,
+        on_unmount: EventType[()] | None = None,
+        **props,
+    ) -> MapSymbolLayer:
+        """Reject a layer with nothing to draw."""
+        ...
+
+class MapTerrain(MapcnComponent):
+    @classmethod
+    def create(
+        cls,
+        *children,
+        tiles: Var[list[str]] | list[str] | None = None,
+        url: Var[str] | str | None = None,
+        encoding: Literal["mapbox", "terrarium"]
+        | Var[Literal["mapbox", "terrarium"]]
+        | None = None,
+        tile_size: Var[int] | int | None = None,
+        min_zoom: Var[int] | int | None = None,
+        max_zoom: Var[int] | int | None = None,
+        attribution: Var[str] | str | None = None,
+        exaggeration: Var[float] | float | None = None,
+        hillshade: Var[bool] | bool | None = None,
+        hillshade_paint: Var[dict[str, Any]] | dict[str, Any] | None = None,
+        visible: Var[bool] | bool | None = None,
+        before_id: Var[str] | str | None = None,
+        style: Sequence[Mapping[str, Any]]
+        | Mapping[str, Any]
+        | Var[Mapping[str, Any]]
+        | Breakpoints
+        | None = None,
+        key: Any | None = None,
+        id: Any | None = None,
+        ref: Var | None = None,
+        class_name: Any | None = None,
+        custom_attrs: dict[str, Any | Var] | None = None,
+        on_blur: EventType[()] | None = None,
+        on_click: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_context_menu: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_double_click: EventType[()] | EventType[PointerEventInfo] | None = None,
+        on_focus: EventType[()] | None = None,
+        on_load_error: EventType[()] | EventType[RasterLoadError] | None = None,
+        on_mount: EventType[()] | None = None,
+        on_mouse_down: EventType[()] | None = None,
+        on_mouse_enter: EventType[()] | None = None,
+        on_mouse_leave: EventType[()] | None = None,
+        on_mouse_move: EventType[()] | None = None,
+        on_mouse_out: EventType[()] | None = None,
+        on_mouse_over: EventType[()] | None = None,
+        on_mouse_up: EventType[()] | None = None,
+        on_scroll: EventType[()] | None = None,
+        on_scroll_end: EventType[()] | None = None,
+        on_unmount: EventType[()] | None = None,
+        **props,
+    ) -> MapTerrain:
+        """Resolve the preset and reject a terrain with no elevation source."""
+        ...
+
 class MapCamera(MapcnComponent):
     @classmethod
     def create(
@@ -1482,6 +1812,12 @@ map_arc = MapArc.create
 map_geojson = MapGeoJSON.create
 map_cluster_layer = MapClusterLayer.create
 map_camera = MapCamera.create
+map_raster_layer = MapRasterLayer.create
+map_layer = MapLayer.create
+map_heatmap_layer = MapHeatmapLayer.create
+map_circle_layer = MapCircleLayer.create
+map_symbol_layer = MapSymbolLayer.create
+map_terrain = MapTerrain.create
 
 class MapcnNamespace(rx.ComponentNamespace):
     map = staticmethod(Map.create)
@@ -1499,6 +1835,12 @@ class MapcnNamespace(rx.ComponentNamespace):
     geojson = staticmethod(MapGeoJSON.create)
     cluster_layer = staticmethod(MapClusterLayer.create)
     camera = staticmethod(MapCamera.create)
+    raster_layer = staticmethod(MapRasterLayer.create)
+    layer = staticmethod(MapLayer.create)
+    heatmap_layer = staticmethod(MapHeatmapLayer.create)
+    circle_layer = staticmethod(MapCircleLayer.create)
+    symbol_layer = staticmethod(MapSymbolLayer.create)
+    terrain = staticmethod(MapTerrain.create)
 
     @staticmethod
     def __call__(
@@ -1539,6 +1881,7 @@ class MapcnNamespace(rx.ComponentNamespace):
         | None = None,
         locale: Var[dict[str, str]] | dict[str, str] | None = None,
         worker_url: Var[str] | str | None = None,
+        glyphs_url: Var[str] | str | None = None,
         style: Sequence[Mapping[str, Any]]
         | Mapping[str, Any]
         | Var[Mapping[str, Any]]
@@ -1607,6 +1950,7 @@ class MapcnNamespace(rx.ComponentNamespace):
             attribution_control: no description
             locale: no description
             worker_url: URL of the MapLibre web worker (defaults to unpkg CDN).
+            glyphs_url: Font server for `map_symbol_layer` text on the blank basemap, e.g. "https://tiles.openfreemap.org/fonts". A url that already carries the {fontstack} and {range} placeholders is used as it is.
             style: The style of the component.
             key: A unique key for the component.
             id: The id for the component.
@@ -1650,13 +1994,21 @@ __all__ = [
     "MapArcEvent",
     "MapCamera",
     "MapClickEvent",
+    "MapCircleLayer",
     "MapClusterLayer",
     "MapControls",
     "MapGeoJSON",
+    "LayerFeatureEvent",
     "MapGeoJSONEvent",
+    "RasterLoadError",
     "MapMarker",
     "MapPopup",
+    "MapHeatmapLayer",
+    "MapLayer",
+    "MapRasterLayer",
     "MapRoute",
+    "MapSymbolLayer",
+    "MapTerrain",
     "MapViewport",
     "MapcnComponent",
     "MapcnNamespace",
@@ -1670,12 +2022,18 @@ __all__ = [
     "map",
     "map_arc",
     "map_camera",
+    "map_circle_layer",
     "map_cluster_layer",
     "map_controls",
     "map_geojson",
     "map_marker",
     "map_popup",
+    "map_heatmap_layer",
+    "map_layer",
+    "map_raster_layer",
     "map_route",
+    "map_symbol_layer",
+    "map_terrain",
     "mapcn",
     "marker_content",
     "marker_label",

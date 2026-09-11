@@ -1075,6 +1075,13 @@ class MapcnNamespace(rx.ComponentNamespace):
     geojson = staticmethod(MapGeoJSON.create)
     cluster_layer = staticmethod(MapClusterLayer.create)
     camera = staticmethod(MapCamera.create)
+    # 0.2.0 layers (Reflex extras).
+    raster_layer = staticmethod(MapRasterLayer.create)
+    layer = staticmethod(MapLayer.create)
+    heatmap_layer = staticmethod(MapHeatmapLayer.create)
+    circle_layer = staticmethod(MapCircleLayer.create)
+    symbol_layer = staticmethod(MapSymbolLayer.create)
+    terrain = staticmethod(MapTerrain.create)
 
 
 mapcn = MapcnNamespace()

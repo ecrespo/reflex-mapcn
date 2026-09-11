@@ -20,6 +20,10 @@ component, so you can build interactive maps in pure Python.
 - Curved arcs, GeoJSON fill/outline layers with hover state, native clustering
 - Controlled viewport, globe projection, custom styles and a blank basemap
 - Every callback delivers JSON-serialisable payloads for Reflex event handlers
+- Data layers drawn by the GPU: circles and symbols for thousands of points,
+  heatmaps for density, raster tiles for radar, railways or satellite imagery,
+  3D terrain with hillshading, and a generic layer for anything else MapLibre
+  can draw
 - Extras for Reflex: `map_camera` (flyTo / easeTo / fitBounds from state),
   `on_click`, `on_move_end` and `on_load` on the map
 
@@ -83,6 +87,56 @@ and `width`) a size.
 | `mapcn.map_geojson` | `MapGeoJSON` | Fill + outline layers, `promote_id`, `fill_hover_paint`, events |
 | `mapcn.map_cluster_layer` | `MapClusterLayer` | Native clustering, `on_point_click`, `on_cluster_click` |
 | `mapcn.map_camera` | *(Reflex extra)* | Runs a camera command dict from state |
+
+### Data layers (Reflex extras, new in 0.2.0)
+
+These have no counterpart in mapcn upstream. They share one lifecycle: props
+that MapLibre can apply in place (`data`, paint, `layout`, `filter`, zoom
+range, layer order) never recreate the layer, everything is re-added after a
+theme change, and nothing is left behind when the component unmounts.
+
+| Reflex factory | Draws | Key props |
+| --- | --- | --- |
+| `mapcn.map_raster_layer` | Third-party tiles over the basemap | `preset`, `tiles`, `url`, `opacity`, `tile_size`, `scheme`, `before_id` |
+| `mapcn.map_layer` | Any MapLibre source + layer | `source` (spec or style source id), `layer`, `interactive`, `hover_paint` |
+| `mapcn.map_heatmap_layer` | Point density | `data`, `weight_property` + `weight_range`, `radius`, `max_zoom_fade` |
+| `mapcn.map_circle_layer` | Thousands of points | `data`, `promote_id`, `radius`, `color`, `filter`, `hover_paint`, events |
+| `mapcn.map_symbol_layer` | Icons and labels | `data`, `images`, `icon_image`, `text_field`, `text_font`, events |
+| `mapcn.map_terrain` | 3D relief and hillshading | `preset`, `tiles`, `encoding`, `exaggeration`, `hillshade` |
+
+`map_circle_layer` and `map_symbol_layer` are interactive by default; the
+generic `map_layer` is not, since it may well be raster or background.
+
+Paint props take a number, a colour or a MapLibre expression. Expressions are
+plain JSON lists, and `reflex_mapcn` ships four helpers that build the common
+ones:
+
+```python
+from reflex_mapcn import interpolate, match, step, zoom_interpolate
+
+interpolate("mag", [(4, 4), (7, 24)])     # radius by magnitude
+step("depth", "#ef4444", [(70, "#f97316"), (300, "#3b82f6")])   # colour by depth
+match("slip_type", {"Dextral": "#ef4444"}, "#64748b")
+zoom_interpolate([(0, 2), (9, 20)])
+```
+
+### Tile presets
+
+`preset` fills in the tiles, the zoom limits and the attribution each service
+requires, and any prop you pass wins over it. They all work without an API
+key. Read them from `reflex_mapcn.RASTER_PRESETS` and
+`reflex_mapcn.TERRAIN_PRESETS`.
+
+| Preset | Component | Shows | Licence and attribution |
+| --- | --- | --- | --- |
+| `openrailwaymap` | `map_raster_layer` | Railway lines and infrastructure | CC BY-SA 2.0 — © OpenRailwayMap contributors, © OpenStreetMap |
+| `openseamap` | `map_raster_layer` | Nautical marks and seaways | CC BY-SA 2.0 — © OpenSeaMap contributors |
+| `esri_satellite` | `map_raster_layer` | Satellite imagery | Esri Terms of Use — Tiles © Esri, Maxar, Earthstar Geographics |
+| `rainviewer` | `map_raster_layer` | Weather radar, past and forecast | RainViewer Terms of Use, free for non-commercial use — © RainViewer |
+| `aws_terrarium` | `map_terrain` | Elevation for 3D relief | Open — Terrain: Mapzen / AWS Terrain Tiles |
+
+Attribution is not optional: MapLibre renders it in the attribution control,
+and every preset carries the text its source asks for.
 
 A `mapcn.mapcn` namespace mirrors the same factories with shorter names
 (`mapcn.mapcn.marker`, `mapcn.mapcn.geojson`, ...).
@@ -186,6 +240,120 @@ mapcn.map(styles={"light": "https://tiles.openfreemap.org/styles/bright",
                   "dark": "https://tiles.openfreemap.org/styles/dark"})
 mapcn.map(projection={"type": "globe"}, zoom=1)
 mapcn.map(blank=True)   # transparent, tile-less canvas for data viz
+```
+
+### Points by the thousand
+
+`map_circle_layer` draws the whole collection on the GPU, and `filter` is
+applied in place, so a time slider never goes back to the server.
+
+```python
+class State(rx.State):
+    quakes: dict = {"type": "FeatureCollection", "features": []}
+    max_time: int = 1_700_000_000_000
+
+    @rx.var
+    def layer_filter(self) -> list:
+        return ["<=", ["get", "time"], self.max_time]
+
+
+def quake_map():
+    return mapcn.map(
+        mapcn.map_circle_layer(
+            data=State.quakes,
+            promote_id="id",
+            radius=interpolate("mag", [(4, 4), (7, 24)]),
+            color=step("depth", "#ef4444", [(70, "#f97316"), (300, "#3b82f6")]),
+            filter=State.layer_filter,
+            hover_paint={"circle-stroke-width": 3},
+            on_click=State.select_quake,
+        ),
+        center=[-66.9, 10.5],
+        zoom=6,
+    )
+```
+
+### Weather radar
+
+RainViewer frame paths expire after about two hours, so read the index from
+the backend and keep the tiles in state.
+
+```python
+from reflex_mapcn import rainviewer_frames, rainviewer_tiles
+
+
+class State(rx.State):
+    radar_tiles: list[str] = []
+
+    @rx.event(background=True)
+    async def follow_radar(self):
+        while True:
+            frames = rainviewer_frames()
+            if frames["past"]:
+                async with self:
+                    self.radar_tiles = rainviewer_tiles(
+                        frames["past"][-1], frames["host"]
+                    )
+            await asyncio.sleep(300)
+
+
+mapcn.map_raster_layer(preset="rainviewer", tiles=State.radar_tiles, opacity=0.7)
+```
+
+### Live traffic with your own key
+
+There is no preset for traffic because every provider requires a commercial
+key. Any XYZ tile service works, and the key stays in the environment:
+
+```python
+import os
+
+TOMTOM = os.environ["TOMTOM_API_KEY"]
+
+mapcn.map_raster_layer(
+    tiles=[
+        "https://api.tomtom.com/traffic/map/4/tile/flow/relative0/"
+        "{z}/{x}/{y}.png?key=" + TOMTOM
+    ],
+    attribution="© TomTom",
+    opacity=0.8,
+)
+```
+
+### 3D buildings from the basemap itself
+
+`map_layer` can attach to a source the style already provides, so the
+buildings of an OpenMapTiles basemap need no data of your own.
+
+```python
+mapcn.map(
+    mapcn.map_layer(
+        source="openmaptiles",
+        layer={
+            "type": "fill-extrusion",
+            "source-layer": "building",
+            "minzoom": 14,
+            "paint": {
+                "fill-extrusion-height": ["get", "render_height"],
+                "fill-extrusion-color": "#94a3b8",
+                "fill-extrusion-opacity": 0.8,
+            },
+        },
+    ),
+    styles={"light": "https://tiles.openfreemap.org/styles/liberty"},
+    pitch=55,
+    zoom=15,
+)
+```
+
+### Relief under the data
+
+```python
+mapcn.map(
+    mapcn.map_terrain(preset="aws_terrarium", hillshade=True, exaggeration=1.3),
+    pitch=60,
+    zoom=9,
+)
 ```
 
 ## Theming

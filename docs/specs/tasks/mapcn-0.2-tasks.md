@@ -93,7 +93,7 @@
 - **Depende de:** T-003, T-005
 - **Done:** JSX: `setTerrain` llamado con `{source, exaggeration}`; cambio de `exaggeration` no recrea fuente; segundo terrain reemplaza con warn; desmontaje ⇒ `setTerrain(null)`.
 
-### T-013 · Exportaciones, `.pyi`, README de componentes
+### T-013 · Exportaciones, `.pyi`, README de componentes — `[x] 2026-09-11`
 - **Qué:** actualizar `__init__.py`, `MapcnNamespace`, `__all__`; `uv run reflex component build`; README: tabla de componentes nuevos, presets con licencias/atribuciones, recetas (tráfico TomTom vía tiles, edificios 3D, radar).
 - **REQ:** Art. 1, Art. 7
 - **Depende de:** T-006..T-012
@@ -225,6 +225,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-11 | T-013 | OK | TDD: 4 tests que exigen factorías en `__all__`, alias `Mapcn*`, espacio de nombres, presets y helpers accesibles desde el paquete, y stubs que declaran los seis componentes. `__init__.py` reexporta `presets` y `helpers` (Tech §5.1). `reflex component build` regenera `mapcn.pyi` (+358 líneas). README: tabla de capas, tabla de presets con licencia y atribución, y cinco recetas (puntos masivos, radar, tráfico con clave propia, edificios 3D, relieve). La comprobación de la rueda en CI ahora exige `presets.py` y `helpers.py`; verificado que ambos viajan. Fase 2 completa. 69 tests Python y 56 JSX en verde. |
 | 2026-09-11 | T-012 | OK | TDD: 5 tests de pytest (preset, precedencia, validación) y 8 en Chromium (fuente raster-dem y activación, hillshade con pintura fusionada, exageración en caliente sin recrear la fuente, apagado al desmontar, restauración tras cambio de estilo, segundo terreno que reemplaza avisando, elevación en el viewport, fallo de teselas DEM). El mapa guarda el terreno activo en un ref del contexto, así que un desmontaje tardío no apaga el relieve de otro componente. Refactor: el informe de error de teselas se comparte entre raster y terreno. 65 tests Python y 56 JSX en verde. Con esto los seis componentes de F1-F5 están completos. |
 | 2026-09-11 | T-011 | OK | TDD: 2 tests de pytest y 6 en Chromium (mapeo de icono y texto a layout y paint, inyección de `glyphs` en el estilo transparente en sus dos formas de URL, texto sin tipografías que avisa y omite solo la etiqueta, imágenes antes de la capa y retiradas al desmontar, interactividad por defecto). `Map` gana `glyphs_url`, que es aditivo y no cambia ninguna firma de 0.1.0. 60 tests Python y 48 JSX en verde. |
 | 2026-09-11 | T-010 | OK | TDD: 3 tests de pytest y 7 en Chromium (ids y `promote_id`, defaults, mapeo completo de pintura con `circle-sort-key` en layout y no en paint, filtro en caliente, interactividad por defecto y su desactivación, opciones de agrupación que reconstruyen la fuente). El benchmark de 10 000 puntos (REQ-PNT-007) no se puede medir contra el MapLibre simulado: queda para T-020 con `reflex run`. 58 tests Python y 42 JSX en verde. |
