@@ -55,7 +55,7 @@
 - **Depende de:** T-003, T-005
 - **Done:** tests Python (validación, preset merge, codegen `tiles`/`rasterOpacity`) y JSX (add, opacity caliente, tiles fría recrea, style.load) en verde.
 
-### T-007 · Helper RainViewer `[P]`
+### T-007 · Helper RainViewer `[P]` — `[x] 2026-09-11`
 - **Qué:** `rainviewer_frames(timeout=10)` con httpx (sync) y `rainviewer_tiles(frame, host, size, color, smooth, snow)`; timeout/JSON inválido ⇒ frames vacíos + `logging.warning`.
 - **REQ:** REQ-RAS-006, REQ-RAS-007
 - **Archivos:** `helpers.py`, `tests/test_helpers.py` (mock httpx)
@@ -225,6 +225,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-11 | T-007 | OK | TDD: 8 tests con el cliente HTTP simulado antes del código (éxito, timeout, JSON inválido, estado 503, payload sin radar, plantilla de teselas y sus opciones). `helpers.py` importa `httpx` directamente, así que se declara como dependencia explícita en `pyproject.toml`; ya venía con reflex. 42 tests Python y 25 JSX en verde. |
 | 2026-09-11 | T-006 | OK | TDD en dos frentes: 9 tests de pytest y 8 en Chromium, escritos antes del componente. Decisión de implementación: el rango de zoom sale de la clave de reconstrucción del hook (`sourceIdentity`), porque REQ-RAS-002 exige aplicarlo con `setLayerZoomRange` sin recrear la fuente; la fuente conserva su `maxzoom` nativo para que el sobre-zoom siga funcionando. 34 tests Python y 25 JSX en verde. |
 | 2026-09-11 | T-005 | OK | TDD: `tests/test_presets.py` y `tests/test_helpers.py` primero (rojo: módulos inexistentes), luego `presets.py` y `helpers.py`. 19 tests nuevos, 25 de pytest en total. Los helpers rechazan listas de stops vacías o no ascendentes, que MapLibre rechazaría en tiempo de estilo. |
 | 2026-09-11 | T-003, T-004 | OK | TDD: `tests/js/tests/layer_runtime.test.mjs` primero (rojo: no existía `useMapLayer`), luego el hook. 17/17 passing, ERRORS: none. Mutación de tres puntos del hook (setFilter, dedupe de advertencias, orden de limpieza) para comprobar que los tests discriminan; la primera versión del test de `before_id` no detectaba la mutación y se reforzó con una reconstrucción en frío. |

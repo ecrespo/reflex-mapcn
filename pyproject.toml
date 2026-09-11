@@ -20,7 +20,9 @@ keywords = [
   "markers",
 ]
 
-dependencies = ["reflex>=0.8.1"]
+# httpx already comes with reflex; it is declared because `helpers.py` imports
+# it directly for the RainViewer frame index.
+dependencies = ["reflex>=0.8.1", "httpx>=0.27"]
 
 classifiers = [
   "Development Status :: 4 - Beta",
