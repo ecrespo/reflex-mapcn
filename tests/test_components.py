@@ -422,3 +422,44 @@ def test_REQ_PNT_002_symbol_layer_renders_icons_and_text():
 def test_REQ_PNT_002_a_symbol_layer_without_data_is_rejected():
     with pytest.raises(ValueError, match="data is required"):
         mapcn.map_symbol_layer(icon_image="pin")
+
+
+def test_REQ_TER_002_the_aws_preset_fills_tiles_and_encoding():
+    terrain = mapcn.map_terrain(preset="aws_terrarium")
+    assert "elevation-tiles-prod" in _prop(terrain, "tiles")
+    assert "terrarium" in _prop(terrain, "encoding")
+    assert _prop(terrain, "tile_size") == "256"
+    assert _prop(terrain, "max_zoom") == "15"
+    assert "Mapzen" in _prop(terrain, "attribution")
+
+
+def test_REQ_TER_002_an_explicit_prop_overrides_the_terrain_preset():
+    terrain = mapcn.map_terrain(preset="aws_terrarium", max_zoom=12, exaggeration=1.5)
+    assert _prop(terrain, "max_zoom") == "12"
+    assert _prop(terrain, "exaggeration") == "1.5"
+
+
+def test_REQ_TER_001_terrain_without_preset_tiles_or_url_is_rejected():
+    with pytest.raises(ValueError, match="provide preset, tiles or url"):
+        mapcn.map_terrain(exaggeration=1.2)
+
+
+def test_REQ_TER_002_an_unknown_terrain_preset_is_rejected():
+    with pytest.raises(ValueError, match="unknown preset"):
+        mapcn.map_terrain(preset="everest")
+
+
+def test_REQ_TER_003_terrain_renders_with_hillshade():
+    rendered = _render(
+        mapcn.map(
+            mapcn.map_terrain(
+                preset="aws_terrarium",
+                exaggeration=1.3,
+                hillshade=True,
+                hillshade_paint={"hillshade-shadow-color": "#334155"},
+            )
+        )
+    )
+    assert "MapcnMapTerrain" in rendered
+    assert "hillshadePaint" in rendered
+    assert "exaggeration" in rendered

@@ -210,12 +210,17 @@ function DefaultLoader() {
 
 function getViewport(map) {
   const center = map.getCenter();
-  return {
+  const viewport = {
     center: [center.lng, center.lat],
     zoom: map.getZoom(),
     bearing: map.getBearing(),
     pitch: map.getPitch(),
   };
+  // With terrain on, the centre has a height worth reporting.
+  if (map.getTerrain?.()) {
+    viewport.elevation = map.queryTerrainElevation?.(center) ?? null;
+  }
+  return viewport;
 }
 
 /** Keys that are Reflex/React concerns and must never reach MapLibre. */
@@ -252,6 +257,7 @@ const Map = forwardRef(function Map(
   const [isStyleLoaded, setIsStyleLoaded] = useState(false);
   const [pendingStyle, setPendingStyle] = useState(null);
   const currentStyleRef = useRef(null);
+  const terrainRef = useRef(null);
   const styleSwapInFlightRef = useRef(false);
   const internalUpdateRef = useRef(false);
   const resolvedTheme = useResolvedTheme(themeProp);
@@ -415,6 +421,7 @@ const Map = forwardRef(function Map(
       map: mapInstance,
       isLoaded: isLoaded && isStyleLoaded,
       resolvedTheme,
+      terrainRef,
     }),
     [mapInstance, isLoaded, isStyleLoaded, resolvedTheme],
   );
@@ -2497,6 +2504,39 @@ const RASTER_HOT_KEYS = ["paint", "layout", "zoomRange", "beforeId"];
 const TILE_ERROR_THROTTLE_MS = 60000;
 
 /**
+ * Report a failing tile service to the application, at most once a minute.
+ *
+ * MapLibre emits an error for every tile it cannot fetch; a page only needs to
+ * know that the service is down.
+ */
+function useTileErrorReporter(map, isLoaded, sourceId, onLoadError) {
+  const onLoadErrorRef = useRef(onLoadError);
+  onLoadErrorRef.current = onLoadError;
+  const reportsErrors = !!onLoadError;
+
+  useEffect(() => {
+    if (!map || !isLoaded || !reportsErrors) return undefined;
+
+    let lastReport = 0;
+    const handleError = (event) => {
+      if (event?.sourceId !== sourceId) return;
+      const now = Date.now();
+      if (lastReport && now - lastReport < TILE_ERROR_THROTTLE_MS) return;
+      lastReport = now;
+      onLoadErrorRef.current?.({
+        source_id: sourceId,
+        message: event?.error?.message ?? "tile request failed",
+      });
+    };
+
+    map.on("error", handleError);
+    return () => {
+      map.off("error", handleError);
+    };
+  }, [map, isLoaded, sourceId, reportsErrors]);
+}
+
+/**
  * Third-party raster tiles on top of the basemap: radar, railways, nautical
  * charts, satellite imagery, traffic. Point it at a set of `{z}/{x}/{y}`
  * templates or at a TileJSON url; the Python side resolves presets.
@@ -2590,30 +2630,7 @@ function RasterLayer({
 
   useMapLayer({ id, sourceId, source, layers, beforeId, hotKeys: RASTER_HOT_KEYS });
 
-  const onLoadErrorRef = useRef(onLoadError);
-  onLoadErrorRef.current = onLoadError;
-  const reportsErrors = !!onLoadError;
-
-  useEffect(() => {
-    if (!map || !isLoaded || !reportsErrors) return undefined;
-
-    let lastReport = 0;
-    const handleError = (event) => {
-      if (event?.sourceId !== sourceId) return;
-      const now = Date.now();
-      if (lastReport && now - lastReport < TILE_ERROR_THROTTLE_MS) return;
-      lastReport = now;
-      onLoadErrorRef.current?.({
-        source_id: sourceId,
-        message: event?.error?.message ?? "tile request failed",
-      });
-    };
-
-    map.on("error", handleError);
-    return () => {
-      map.off("error", handleError);
-    };
-  }, [map, isLoaded, sourceId, reportsErrors]);
+  useTileErrorReporter(map, isLoaded, sourceId, onLoadError);
 
   return null;
 }
@@ -3075,6 +3092,115 @@ function SymbolLayer({
 }
 
 // ---------------------------------------------------------------------------
+// Terrain (Reflex extra)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_HILLSHADE_PAINT = { "hillshade-exaggeration": 0.5 };
+
+// The dem source feeds `setTerrain`; there is no layer unless hillshade is on.
+const TERRAIN_HOT_KEYS = ["paint", "layout", "beforeId"];
+
+/**
+ * 3D relief from elevation tiles, with optional hillshading.
+ *
+ * MapLibre supports one terrain per map. Mounting a second one replaces the
+ * first with a warning, and a component only switches terrain off if it is
+ * still the one that owns it, so a late unmount cannot undo what another
+ * component just set.
+ */
+function MapTerrain({
+  id: propId,
+  tiles,
+  url,
+  encoding = "terrarium",
+  tileSize = 256,
+  minZoom,
+  maxZoom,
+  attribution,
+  exaggeration = 1.0,
+  hillshade = false,
+  hillshadePaint,
+  visible = true,
+  beforeId,
+  onLoadError,
+}) {
+  const { map, isLoaded, terrainRef } = useMap();
+  const autoId = useId();
+  const id = propId ?? autoId;
+  const sourceId = `terrain-source-${id}`;
+
+  const stableTiles = useStableValue(tiles);
+  const stableHillshadePaint = useStableValue(hillshadePaint);
+
+  const source = useMemo(
+    () => ({
+      type: "raster-dem",
+      ...(stableTiles ? { tiles: stableTiles } : {}),
+      ...(url ? { url } : {}),
+      encoding,
+      tileSize,
+      ...(attribution ? { attribution } : {}),
+      ...(minZoom !== undefined ? { minzoom: minZoom } : {}),
+      ...(maxZoom !== undefined ? { maxzoom: maxZoom } : {}),
+    }),
+    [stableTiles, url, encoding, tileSize, attribution, minZoom, maxZoom],
+  );
+
+  const layers = useMemo(() => {
+    if (!hillshade) return [];
+    return [
+      {
+        id: `hillshade-layer-${id}`,
+        type: "hillshade",
+        paint: { ...DEFAULT_HILLSHADE_PAINT, ...(stableHillshadePaint ?? {}) },
+        layout: { visibility: visible ? "visible" : "none" },
+      },
+    ];
+  }, [hillshade, id, stableHillshadePaint, visible]);
+
+  useMapLayer({ id, sourceId, source, layers, beforeId, hotKeys: TERRAIN_HOT_KEYS });
+
+  const exaggerationRef = useRef(exaggeration);
+  exaggerationRef.current = exaggeration;
+
+  // Switch terrain on, and claim ownership of it.
+  useEffect(() => {
+    if (!map || !isLoaded || !visible) return undefined;
+    if (!map.getSource(sourceId)) return undefined;
+
+    const owner = terrainRef?.current;
+    if (owner && owner !== id) {
+      console.warn("mapcn: only one map_terrain per map is supported; replacing");
+    }
+    if (terrainRef) terrainRef.current = id;
+    map.setTerrain({ source: sourceId, exaggeration: exaggerationRef.current });
+
+    return () => {
+      // Another component may have taken over in the meantime.
+      if (terrainRef && terrainRef.current !== id) return;
+      try {
+        map.setTerrain(null);
+      } catch {
+        // The style may be mid-reload.
+      }
+      if (terrainRef) terrainRef.current = null;
+    };
+  }, [map, isLoaded, sourceId, visible, id, terrainRef]);
+
+  // Exaggeration is applied without touching the source.
+  useEffect(() => {
+    if (!map || !isLoaded || !visible) return;
+    if (terrainRef && terrainRef.current !== id) return;
+    if (!map.getTerrain?.()) return;
+    map.setTerrain({ source: sourceId, exaggeration });
+  }, [map, isLoaded, visible, id, sourceId, exaggeration, terrainRef]);
+
+  useTileErrorReporter(map, isLoaded, sourceId, onLoadError);
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Reflex helpers
 // ---------------------------------------------------------------------------
 
@@ -3117,6 +3243,7 @@ export {
   HeatmapLayer,
   CircleLayer,
   SymbolLayer,
+  MapTerrain,
   MapMarker,
   MarkerContent,
   MarkerPopup,

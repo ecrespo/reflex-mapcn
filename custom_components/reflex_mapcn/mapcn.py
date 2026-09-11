@@ -39,7 +39,7 @@ from reflex.components.component import NoSSRComponent
 from reflex.event import passthrough_event_spec
 
 from .helpers import interpolate, zoom_interpolate
-from .presets import RASTER_PRESETS
+from .presets import RASTER_PRESETS, TERRAIN_PRESETS
 
 # ---------------------------------------------------------------------------
 # Assets
@@ -921,6 +921,66 @@ class MapSymbolLayer(MapcnComponent):
         return super().create(*children, **props)
 
 
+class MapTerrain(MapcnComponent):
+    """3D relief from elevation tiles, with optional hillshading (Reflex extra).
+
+    ::
+
+        mapcn.map_terrain(preset="aws_terrarium", hillshade=True, exaggeration=1.3)
+
+    ``exaggeration`` is applied without rebuilding the elevation source, so it
+    can be driven from a slider. MapLibre supports one terrain per map:
+    mounting a second one replaces the first and says so in the console.
+
+    Pitch the map (``pitch=60``) to see the relief; hillshading alone is
+    visible from straight above.
+    """
+
+    tag = "MapTerrain"
+    alias = "MapcnMapTerrain"
+
+    tiles: rx.Var[list[str]]
+    url: rx.Var[str]
+    encoding: rx.Var[Literal["terrarium", "mapbox"]]
+    tile_size: rx.Var[int]
+    min_zoom: rx.Var[int]
+    max_zoom: rx.Var[int]
+    attribution: rx.Var[str]
+
+    # Vertical scale of the relief; applied without recreating the source.
+    exaggeration: rx.Var[float]
+    # Add a hillshade layer over the same elevation source.
+    hillshade: rx.Var[bool]
+    # Merged over {"hillshade-exaggeration": 0.5}.
+    hillshade_paint: rx.Var[dict[str, Any]]
+    visible: rx.Var[bool]
+    before_id: rx.Var[str]
+
+    # Fires at most once a minute while the elevation tiles fail to load.
+    on_load_error: rx.EventHandler[passthrough_event_spec(RasterLoadError)]
+
+    @classmethod
+    def create(cls, *children, **props) -> rx.Component:
+        """Resolve the preset and reject a terrain with no elevation source."""
+        preset_name = props.pop("preset", None)
+        if preset_name is not None:
+            preset = TERRAIN_PRESETS.get(preset_name)
+            if preset is None:
+                known = ", ".join(sorted(TERRAIN_PRESETS))
+                raise ValueError(
+                    f"map_terrain: unknown preset {preset_name!r} (known: {known})"
+                )
+            for key, value in preset.as_props().items():
+                if value in (None, []) or props.get(key) is not None:
+                    continue
+                props[key] = value
+
+        if props.get("tiles") is None and props.get("url") is None:
+            raise ValueError("map_terrain: provide preset, tiles or url")
+
+        return super().create(*children, **props)
+
+
 # ---------------------------------------------------------------------------
 # Reflex extra: imperative camera
 # ---------------------------------------------------------------------------
@@ -993,6 +1053,7 @@ map_layer = MapLayer.create
 map_heatmap_layer = MapHeatmapLayer.create
 map_circle_layer = MapCircleLayer.create
 map_symbol_layer = MapSymbolLayer.create
+map_terrain = MapTerrain.create
 
 
 class MapcnNamespace(rx.ComponentNamespace):
@@ -1042,6 +1103,7 @@ __all__ = [
     "MapRasterLayer",
     "MapRoute",
     "MapSymbolLayer",
+    "MapTerrain",
     "MapViewport",
     "MapcnComponent",
     "MapcnNamespace",
@@ -1066,6 +1128,7 @@ __all__ = [
     "map_raster_layer",
     "map_route",
     "map_symbol_layer",
+    "map_terrain",
     "mapcn",
     "marker_content",
     "marker_label",

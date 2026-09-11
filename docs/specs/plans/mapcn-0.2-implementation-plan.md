@@ -69,7 +69,7 @@ Cuatro fases incrementales, cada una deployable (el paquete sigue instalable y l
 | F2-05 | `HeatmapLayer` JSX + `MapHeatmapLayer` (+ `weight_property`, `max_zoom_fade`) + tests | 0.5d | F2-04 | ✔ 2026-09-11 |
 | F2-06 | `CircleLayer` JSX + `MapCircleLayer` (+ cluster COULD) + tests; benchmark 10k puntos manual | 0.75d | F2-04 | ✔ 2026-09-11 (benchmark en T-020) |
 | F2-07 | `SymbolLayer` JSX + `MapSymbolLayer` (+ `images`, glyphs warn) + `Map.glyphs_url` + tests | 1d | F2-06 | ✔ 2026-09-11 |
-| F2-08 | `MapTerrain` JSX + `MapTerrain` Python (+ hillshade, singleton, `elevation` COULD) + tests | 0.75d | F1-02, F2-01 | ☐ |
+| F2-08 | `MapTerrain` JSX + `MapTerrain` Python (+ hillshade, singleton, `elevation` COULD) + tests | 0.75d | F1-02, F2-01 | ✔ 2026-09-11 |
 | F2-09 | `__init__.py`/namespace/`__all__`, `reflex component build` (.pyi), README sección "Layers" | 0.5d | F2-02..08 | ☐ |
 
 **Done:** todos los REQ MUST de F1–F5 con test que los cita; `uv run reflex component build` genera `.pyi` sin error; demo 0.1.0 compila sin cambios.
