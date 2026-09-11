@@ -14,23 +14,26 @@ from zoneinfo import ZoneInfo
 
 import reflex as rx
 import reflex_mapcn as mapcn
+from reflex_mapcn import match
 
 from ..layout import page, section
 from ..services import usgs
 from ..venezuela_data import (
     DEPTH_COLOR,
+    FAULTS_ATTRIBUTION,
     MAG_RADIUS,
     NOTABLE_QUAKES,
+    SLIP_TYPE_COLORS,
+    SLIP_TYPE_DEFAULT_COLOR,
     VENEZUELA_CENTER,
+    VENEZUELA_FAULTS_URL,
 )
 
 CARACAS = ZoneInfo("America/Caracas")
 FIRST_YEAR = 1900
 BASE_STYLE = "https://tiles.openfreemap.org/styles/positron"
 
-ATTRIBUTION = (
-    "USGS Earthquake Hazards Program · GEM Global Active Faults (CC BY-SA 4.0)"
-)
+ATTRIBUTION = f"USGS Earthquake Hazards Program · {FAULTS_ATTRIBUTION}"
 
 # The catalogue only covers small events reliably from about 1973 onwards.
 COVERAGE_NOTE = (
@@ -52,6 +55,25 @@ DEPTH_BAND_LABELS = {
 }
 
 EMPTY_COLLECTION: dict = {"type": "FeatureCollection", "features": []}
+
+# Live feed: the backend flags anything under 24 hours old, and the ring layer
+# draws only those. MapLibre cannot animate a pulse, and driving one from state
+# would flood the websocket, so the ring is static and simply wider.
+LIVE_POLL_S = 60
+RECENT_FILTER = ["==", ["get", "recent"], True]
+LIVE_COLOR = "#facc15"
+
+# Density: a magnitude 8 counts far more than a 4, and the heatmap hands over
+# to the point layer as the map is zoomed in.
+HEATMAP_WEIGHT_PROPERTY = "mag"
+HEATMAP_WEIGHT_RANGE = [4.0, 8.0]
+HEATMAP_MAX_ZOOM_FADE = 8
+
+# Faults: colour by the kind of movement, slate for anything unclassified.
+FAULT_COLOR = match("slip_type", SLIP_TYPE_COLORS, SLIP_TYPE_DEFAULT_COLOR)
+
+TERRAIN_PRESET = "aws_terrarium"
+TERRAIN_EXAGGERATION = 1.3
 
 
 def depth_band_from_label(label: str) -> str:
@@ -121,12 +143,21 @@ class SismosState(rx.State):
     error: str = ""
     loading: bool = False
 
+    live: dict = EMPTY_COLLECTION
+    live_count: int = 0
+    live_fetched_at: str = ""
+
     year: int = current_year()
     month: int = 12
     min_mag: float = 4.0
     depth_band: str = "all"
     playing: bool = False
     show_notable: bool = True
+    show_live: bool = False
+    show_heat: bool = False
+    show_faults: bool = True
+    show_terrain: bool = False
+    hovered_fault: str = ""
 
     selected: dict = {}
 
@@ -254,6 +285,56 @@ class SismosState(rx.State):
         self.show_notable = bool(value)
 
     @rx.event
+    def toggle_heat(self, value: bool):
+        self.show_heat = bool(value)
+
+    @rx.event
+    def toggle_faults(self, value: bool):
+        self.show_faults = bool(value)
+
+    @rx.event
+    def toggle_terrain(self, value: bool):
+        self.show_terrain = bool(value)
+
+    @rx.event
+    def show_fault(self, event: dict | None):
+        if not event:
+            self.hovered_fault = ""
+            return
+        properties = (event.get("feature") or {}).get("properties") or {}
+        name = properties.get("name") or "Falla sin nombre"
+        slip = properties.get("slip_type") or "desplazamiento desconocido"
+        self.hovered_fault = f"{name} · {slip}"
+
+    @rx.event
+    def toggle_live(self, value: bool):
+        """Start or stop the live poll."""
+        self.show_live = bool(value)
+        if self.show_live:
+            return SismosState.poll_live
+
+    @rx.event(background=True)
+    async def poll_live(self):
+        """Refresh the last thirty days while the live switch is on."""
+        while True:
+            async with self:
+                if not self.show_live:
+                    return
+
+            result = await usgs.fetch_live()
+
+            async with self:
+                if not self.show_live:
+                    return
+                self.live = result["features"]
+                self.live_count = result["count"]
+                self.live_fetched_at = result["fetched_at"]
+                if result["error"]:
+                    self.error = result["error"]
+
+            await asyncio.sleep(LIVE_POLL_S)
+
+    @rx.event
     def stop(self):
         self.playing = False
 
@@ -372,11 +453,57 @@ def _controls() -> rx.Component:
             on_change=SismosState.set_depth_band,
             size="1",
         ),
+        rx.hstack(
+            rx.checkbox(
+                "En vivo",
+                checked=SismosState.show_live,
+                on_change=SismosState.toggle_live,
+                size="1",
+            ),
+            rx.checkbox(
+                "Densidad",
+                checked=SismosState.show_heat,
+                on_change=SismosState.toggle_heat,
+                size="1",
+            ),
+            spacing="3",
+            width="100%",
+        ),
+        rx.hstack(
+            rx.checkbox(
+                "Fallas",
+                checked=SismosState.show_faults,
+                on_change=SismosState.toggle_faults,
+                size="1",
+            ),
+            rx.checkbox(
+                "Relieve",
+                checked=SismosState.show_terrain,
+                on_change=SismosState.toggle_terrain,
+                size="1",
+            ),
+            spacing="3",
+            width="100%",
+        ),
         rx.checkbox(
             "Sismos notables",
             checked=SismosState.show_notable,
             on_change=SismosState.toggle_notable,
             size="1",
+        ),
+        rx.cond(
+            SismosState.show_live,
+            rx.text(
+                SismosState.live_count,
+                " sismos en 30 días · ",
+                SismosState.live_fetched_at,
+                size="1",
+                color=rx.color("gray", 11),
+            ),
+        ),
+        rx.cond(
+            SismosState.hovered_fault != "",
+            rx.text(SismosState.hovered_fault, size="1", weight="bold"),
         ),
         rx.text(COVERAGE_NOTE, size="1", color=rx.color("gray", 11)),
         rx.text(ATTRIBUTION, size="1", color=rx.color("gray", 11)),
@@ -404,6 +531,71 @@ def _map() -> rx.Component:
             filter=SismosState.layer_filter,
             hover_paint={"circle-stroke-width": 2},
             on_click=SismosState.select_quake,
+        ),
+        rx.cond(
+            SismosState.show_heat,
+            mapcn.map_heatmap_layer(
+                id="density",
+                data=SismosState.catalog,
+                filter=SismosState.layer_filter,
+                weight_property=HEATMAP_WEIGHT_PROPERTY,
+                weight_range=HEATMAP_WEIGHT_RANGE,
+                max_zoom_fade=HEATMAP_MAX_ZOOM_FADE,
+            ),
+        ),
+        rx.cond(
+            SismosState.show_faults,
+            mapcn.map_layer(
+                id="faults",
+                source={"type": "geojson", "data": VENEZUELA_FAULTS_URL},
+                layer={
+                    "type": "line",
+                    "paint": {
+                        "line-color": FAULT_COLOR,
+                        "line-width": 1.4,
+                        "line-opacity": 0.9,
+                    },
+                },
+                interactive=True,
+                hover_paint={"line-width": 3},
+                on_hover=SismosState.show_fault,
+            ),
+        ),
+        rx.cond(
+            SismosState.show_live,
+            rx.fragment(
+                mapcn.map_circle_layer(
+                    id="live",
+                    data=SismosState.live,
+                    promote_id="id",
+                    radius=MAG_RADIUS,
+                    color=LIVE_COLOR,
+                    opacity=0.9,
+                    stroke_color="#78350f",
+                    stroke_width=0.8,
+                    on_click=SismosState.select_quake,
+                ),
+                mapcn.map_circle_layer(
+                    id="live-ring",
+                    data=SismosState.live,
+                    filter=RECENT_FILTER,
+                    radius=18,
+                    color="rgba(0,0,0,0)",
+                    opacity=0,
+                    stroke_color=LIVE_COLOR,
+                    stroke_width=2,
+                    stroke_opacity=0.5,
+                    interactive=False,
+                ),
+            ),
+        ),
+        rx.cond(
+            SismosState.show_terrain,
+            mapcn.map_terrain(
+                preset=TERRAIN_PRESET,
+                hillshade=True,
+                exaggeration=TERRAIN_EXAGGERATION,
+            ),
         ),
         rx.cond(
             SismosState.show_notable,

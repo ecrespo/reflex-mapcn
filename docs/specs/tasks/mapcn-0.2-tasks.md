@@ -118,7 +118,7 @@
 - **Depende de:** T-010, T-014
 - **Done:** `compile_check` OK; en `reflex run` se ven ≥ 1 000 sismos, el slider filtra sin peticiones (verificar en Network), popup correcto.
 
-### T-017 · `/sismos` capas opcionales
+### T-017 · `/sismos` capas opcionales — `[x] 2026-09-11`
 - **Qué:** interruptores En vivo (background loop 60 s con `fetch_live` vía FDSN bbox/M≥2.5/30 días, capa recientes con anillo), Densidad (`map_heatmap_layer` con `weight_property="mag"`, `max_zoom_fade=8`), Fallas (`map_layer` line coloreada por `slip_type`, hover tooltip), Relieve (`map_terrain` preset `aws_terrarium`, hillshade).
 - **REQ:** REQ-SIS-007, 008, 009, 010
 - **Depende de:** T-016, T-009, T-008, T-012, T-015
@@ -226,6 +226,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-11 | Delta 2026-09-heatmap-filter, T-017 | OK | El Delta del filtro en el mapa de calor se aprobó (opción A), se implementó y se plegó a PRD (REQ-HEA-007) y API Spec §3.3. Después T-017: los cuatro interruptores. En vivo con bucle de 60 s y capa de anillo estático para las últimas 24 h (sin animación por estado, DD-009). Densidad con peso por magnitud y desvanecido en zoom 8, ya filtrada. Fallas desde el asset con color por tipo de desplazamiento y tooltip en hover. Relieve con el preset de AWS y sombreado. 6 tests nuevos; 116 tests Python y 57 JSX en verde; las 11 páginas renderizan. |
 | 2026-09-11 | T-016 | OK | TDD: 14 tests sobre funciones puras, porque un estado de Reflex no se puede instanciar fuera de la app; la lógica vive en funciones de módulo y el estado solo delega. Dos fallos reales encontrados por los tests: faltaba el manejador del interruptor de notables (Reflex ya no genera `set_*` implícitos) y el selector de profundidad devolvía la etiqueta en español en vez de la clave, con lo que la cláusula de profundidad nunca habría casado. Se añadió la nota de cobertura del catálogo (hallazgo A-12 del Analyze). Las 11 páginas de la demo renderizan sin error. 109 tests Python en verde. |
 | 2026-09-11 | T-015 | OK | TDD: 13 tests, primero las funciones puras con geometría sintética. La primera versión filtraba fallas pero no recortaba geometrías, y el test del asset lo detectó: una falla llegaba a 19,7° N. Se añadió `clip_line`, que parte la línea en tramos dentro de la caja y conserva el vértice de cruce para que la línea llegue al borde. Descargado el catálogo GEM (10,6 MB) y generado `mapcn_demo/assets/venezuela_fallas.geojson`: 255 fallas, 86 KB, muy por debajo del presupuesto de 300 KB. Atribución CC BY-SA 4.0 y colores por tipo de desplazamiento en `venezuela_data.py`. 95 tests Python y 56 JSX en verde. |
 | 2026-09-11 | T-014 | OK | TDD: 13 tests con una respuesta real del USGS guardada como fixture y sin red. Recorte a 8 propiedades: 33 % del tamaño original con la fixture (medido, no estimado). Caché con reloj inyectable para probar la expiración sin dormir. El camino degradado guarda el último valor bueno con un TTL cien veces mayor, así que un timeout conserva lo que la página ya mostraba; verificado con una mutación que lo elimina. `pythonpath` de pytest incluye `mapcn_demo` para poder probar sus servicios sin instalarla. 82 tests Python en verde. |
