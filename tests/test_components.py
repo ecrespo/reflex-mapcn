@@ -527,3 +527,12 @@ def test_the_type_stubs_declare_the_new_components():
     ):
         assert f"class {name}(" in stub, name
     assert "glyphs_url" in stub
+
+
+def test_REQ_HEA_007_filter_prop_reaches_the_layer():
+    # Delta 2026-09-heatmap-filter: density has to follow the same sliders as
+    # the points, and filtering in the browser is the only way that is cheap.
+    layer = mapcn.map_heatmap_layer(
+        data="/quakes.geojson", filter=["<=", ["get", "time"], 1690000000000]
+    )
+    assert json.loads(str(layer.filter)) == ["<=", ["get", "time"], 1690000000000]

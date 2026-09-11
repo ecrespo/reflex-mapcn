@@ -732,6 +732,9 @@ class MapHeatmapLayer(MapcnComponent):
     # heatmap-color: a ramp over ["heatmap-density"].
     color: rx.Var[list]
     opacity: rx.Var[float | list]
+    # Applied in place, so a slider can drive the density without resending
+    # the data (delta 2026-09-heatmap-filter).
+    filter: rx.Var[list]
     visible: rx.Var[bool]
     before_id: rx.Var[str]
     min_zoom: rx.Var[float]

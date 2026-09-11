@@ -99,7 +99,7 @@ theme change, and nothing is left behind when the component unmounts.
 | --- | --- | --- |
 | `mapcn.map_raster_layer` | Third-party tiles over the basemap | `preset`, `tiles`, `url`, `opacity`, `tile_size`, `scheme`, `before_id` |
 | `mapcn.map_layer` | Any MapLibre source + layer | `source` (spec or style source id), `layer`, `interactive`, `hover_paint` |
-| `mapcn.map_heatmap_layer` | Point density | `data`, `weight_property` + `weight_range`, `radius`, `max_zoom_fade` |
+| `mapcn.map_heatmap_layer` | Point density | `data`, `weight_property` + `weight_range`, `radius`, `filter`, `max_zoom_fade` |
 | `mapcn.map_circle_layer` | Thousands of points | `data`, `promote_id`, `radius`, `color`, `filter`, `hover_paint`, events |
 | `mapcn.map_symbol_layer` | Icons and labels | `data`, `images`, `icon_image`, `text_field`, `text_font`, events |
 | `mapcn.map_terrain` | 3D relief and hillshading | `preset`, `tiles`, `encoding`, `exaggeration`, `hillshade` |

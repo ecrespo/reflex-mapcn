@@ -109,3 +109,19 @@ test("REQ-HEA-006: the heatmap survives a style change and leaves nothing behind
   assertEqual(view.map.getLayersOrder(), [], "layers left behind");
   assertEqual(Object.keys(view.map.getStyle().sources), [], "sources left behind");
 });
+
+test("REQ-HEA-007: a new filter is applied without a rebuild", async () => {
+  const view = await render(heatmap, { id: "density", data: QUAKES });
+
+  await view.setProps({ filter: ["<=", ["get", "time"], 1690000000000] });
+
+  assertEqual(view.map.callsTo("setFilter").length, 1, "setFilter");
+  assertEqual(
+    view.map.getLayer("heatmap-layer-density").filter,
+    ["<=", ["get", "time"], 1690000000000],
+    "filter",
+  );
+  assertEqual(view.map.callsTo("addLayer").length, 1, "the layer was recreated");
+
+  await view.unmount();
+});

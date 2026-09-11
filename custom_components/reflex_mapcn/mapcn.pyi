@@ -1514,6 +1514,7 @@ class MapHeatmapLayer(MapcnComponent):
         radius: Var[float | list] | float | list | None = None,
         color: Var[list] | list | None = None,
         opacity: Var[float | list] | float | list | None = None,
+        filter: Var[list] | list | None = None,
         visible: Var[bool] | bool | None = None,
         before_id: Var[str] | str | None = None,
         min_zoom: Var[float] | float | None = None,

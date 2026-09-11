@@ -143,6 +143,8 @@ mapcn.map_layer(
 | `color` | `list` | rampa azul→amarillo→rojo (ver Data Model §5) | `heatmap-color` |
 | `opacity` | `float \| list` | 0.8 | `heatmap-opacity` |
 | `max_zoom_fade` | `float` | — | genera `heatmap-opacity` que desvanece entre `Z-1` y `Z` (REQ-HEA-004) |
+| `filter` | `list` | — | `filter` (caliente, REQ-HEA-007) |
+| `min_zoom` / `max_zoom` | `float` | — | `minzoom`/`maxzoom` (calientes) |
 | `before_id`, `visible` | | | |
 
 **Eventos:** ninguno (heatmap no es interactivo en MapLibre).
@@ -304,3 +306,4 @@ SemVer. 0.2.0 es aditivo. Deprecaciones futuras: aviso en `create()` (`Deprecati
 |---|---|---|
 | 0.2.0-draft | 2026-09-11 | Versión inicial |
 | 0.2.0-draft.2 | 2026-09-11 | Analyze: advertencias LAY-010/PNT-010, defaults de `interactive` explicados |
+| 0.2.0-draft.3 | 2026-09-11 | Delta `2026-09-heatmap-filter`: `filter`, `min_zoom` y `max_zoom` en `map_heatmap_layer` |

@@ -185,6 +185,7 @@
 | REQ-HEA-002 | T-009 | `test_REQ_HEA_002_prop_mapping` (py) |
 | REQ-HEA-003 (SHOULD) | T-009 | `test_REQ_HEA_003_weight_property_expression` (py) |
 | REQ-HEA-004 (SHOULD) | T-009 | `test_REQ_HEA_004_max_zoom_fade` (py) |
+| REQ-HEA-007 (Delta 2026-09) | T-009, T-017 | `test_REQ_HEA_007_filter_prop_reaches_the_layer` (py), `REQ-HEA-007: a new filter is applied without a rebuild` (js) |
 | REQ-PNT-001 | T-010 | `test_REQ_PNT_001_circle_layer_props` (py+js) |
 | REQ-PNT-002 | T-011 | `test_REQ_PNT_002_symbol_layer_props` (py+js) |
 | REQ-PNT-003 | T-003, T-011 | `test_REQ_PNT_003_images_loaded_and_removed` (js) |

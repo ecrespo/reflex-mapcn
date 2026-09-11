@@ -2723,12 +2723,13 @@ const HEATMAP_DEFAULT_COLOR = [
 ];
 
 // A heatmap is not interactive in MapLibre: it renders density, not features.
-const HEATMAP_HOT_KEYS = ["data", "paint", "layout", "zoomRange", "beforeId"];
+const HEATMAP_HOT_KEYS = ["data", "paint", "layout", "filter", "zoomRange", "beforeId"];
 
 /** Point density as a heatmap. Feed it a point FeatureCollection or a url. */
 function HeatmapLayer({
   id: propId,
   data,
+  filter,
   weight = 1,
   intensity = HEATMAP_DEFAULT_INTENSITY,
   radius = HEATMAP_DEFAULT_RADIUS,
@@ -2743,6 +2744,7 @@ function HeatmapLayer({
   const id = propId ?? autoId;
 
   const stableData = useStableValue(data);
+  const stableFilter = useStableValue(filter);
   const stableWeight = useStableValue(weight);
   const stableIntensity = useStableValue(intensity);
   const stableRadius = useStableValue(radius);
@@ -2767,12 +2769,14 @@ function HeatmapLayer({
           "heatmap-opacity": stableOpacity,
         },
         layout: { visibility: visible ? "visible" : "none" },
+        ...(stableFilter ? { filter: stableFilter } : {}),
         ...(minZoom !== undefined ? { minzoom: minZoom } : {}),
         ...(maxZoom !== undefined ? { maxzoom: maxZoom } : {}),
       },
     ],
     [
       id,
+      stableFilter,
       stableWeight,
       stableIntensity,
       stableRadius,

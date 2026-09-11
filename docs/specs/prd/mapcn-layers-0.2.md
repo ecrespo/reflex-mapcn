@@ -134,6 +134,7 @@ Convenciones: `EL SISTEMA` = el paquete `reflex_mapcn` (JSX + wrapper) salvo que
 - **REQ-HEA-004** (opcional): DONDE se pase `max_zoom_fade=Z`, EL SISTEMA DEBERÁ generar `heatmap-opacity` que interpola de 1 a 0 entre `Z-1` y `Z`, para combinar con una capa de puntos que aparece a partir de `Z`. SHOULD
 - **REQ-HEA-005** (evento): CUANDO cambien `data` o cualquier prop de paint, EL SISTEMA DEBERÁ actualizar en caliente según REQ-LAY-003/004. MUST
 - **REQ-HEA-006** (evento): CUANDO el estilo cambie o el componente se desmonte, EL SISTEMA DEBERÁ comportarse como REQ-RAS-008/009. MUST
+- **REQ-HEA-007** (opcional): DONDE se pase `filter` (expresión MapLibre), EL SISTEMA DEBERÁ aplicarlo a la capa de calor con `setFilter` sin recrear la fuente, con la misma semántica que REQ-LAY-004. MUST *(Delta `docs/changes/2026-09-heatmap-filter/`, aprobado 2026-09-11)*
 
 ### F4 — `map_circle_layer` y `map_symbol_layer`
 
@@ -279,6 +280,7 @@ Convenciones: `EL SISTEMA` = el paquete `reflex_mapcn` (JSX + wrapper) salvo que
 |---|---|---|---|
 | 1.0 | 2026-09-11 | E. Crespo / Claude | Versión inicial (DRAFT) |
 | 1.1 | 2026-09-11 | Claude | Correcciones del Analyze A-01..A-05: REQ-RAS-006 unificado con API, REQ-SIS-007 usa FDSN con bbox, nuevos REQ-LAY-010, REQ-PNT-010, REQ-TER-009 |
+| 1.2 | 2026-09-11 | Claude | Delta `2026-09-heatmap-filter`: nuevo REQ-HEA-007 (`filter` en el mapa de calor), sin el cual REQ-SIS-008 contradecía DD-006 |
 
 ## Aprobaciones
 
