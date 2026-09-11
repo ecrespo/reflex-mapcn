@@ -54,6 +54,12 @@ where = ["custom_components"]
 [tool.setuptools.package-data]
 reflex_mapcn = ["*.jsx", "*.css", "*.pyi", "py.typed"]
 
+[tool.pytest.ini_options]
+# The demo is an application, not a dependency of the package: put it on the
+# path so its services can be tested without installing it.
+pythonpath = [".", "mapcn_demo"]
+testpaths = ["tests"]
+
 [tool.bandit]
 # Tests assert by design (B101) and build output is not ours to audit.
 exclude_dirs = ["tests", ".venv", "mapcn_demo/.web", "mapcn_demo/.states"]

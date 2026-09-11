@@ -101,7 +101,7 @@
 
 ### Fase 3 — Demo
 
-### T-014 · Servicios USGS + caché `[P]`
+### T-014 · Servicios USGS + caché `[P]` — `[x] 2026-09-11`
 - **Qué:** `services/cache.py` (TTLCache), `services/usgs.py` (`fetch_catalog`, `fetch_live` (FDSN con bbox, `minmagnitude=2.5`, últimos 30 días), recorte a `SeismicFeature`, `recent`, descartes por `mag` null), fixtures `tests/demo/fixtures/usgs_sample.json`; tests de parsing, caché (TTL), timeout y status ≠ 200 (mock httpx).
 - **REQ:** REQ-SIS-001 (parte backend), 002, 003
 - **Archivos:** `mapcn_demo/mapcn_demo/services/{__init__,cache,usgs}.py`, `tests/demo/test_usgs.py`
@@ -225,6 +225,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-11 | T-014 | OK | TDD: 13 tests con una respuesta real del USGS guardada como fixture y sin red. Recorte a 8 propiedades: 33 % del tamaño original con la fixture (medido, no estimado). Caché con reloj inyectable para probar la expiración sin dormir. El camino degradado guarda el último valor bueno con un TTL cien veces mayor, así que un timeout conserva lo que la página ya mostraba; verificado con una mutación que lo elimina. `pythonpath` de pytest incluye `mapcn_demo` para poder probar sus servicios sin instalarla. 82 tests Python en verde. |
 | 2026-09-11 | T-013 | OK | TDD: 4 tests que exigen factorías en `__all__`, alias `Mapcn*`, espacio de nombres, presets y helpers accesibles desde el paquete, y stubs que declaran los seis componentes. `__init__.py` reexporta `presets` y `helpers` (Tech §5.1). `reflex component build` regenera `mapcn.pyi` (+358 líneas). README: tabla de capas, tabla de presets con licencia y atribución, y cinco recetas (puntos masivos, radar, tráfico con clave propia, edificios 3D, relieve). La comprobación de la rueda en CI ahora exige `presets.py` y `helpers.py`; verificado que ambos viajan. Fase 2 completa. 69 tests Python y 56 JSX en verde. |
 | 2026-09-11 | T-012 | OK | TDD: 5 tests de pytest (preset, precedencia, validación) y 8 en Chromium (fuente raster-dem y activación, hillshade con pintura fusionada, exageración en caliente sin recrear la fuente, apagado al desmontar, restauración tras cambio de estilo, segundo terreno que reemplaza avisando, elevación en el viewport, fallo de teselas DEM). El mapa guarda el terreno activo en un ref del contexto, así que un desmontaje tardío no apaga el relieve de otro componente. Refactor: el informe de error de teselas se comparte entre raster y terreno. 65 tests Python y 56 JSX en verde. Con esto los seis componentes de F1-F5 están completos. |
 | 2026-09-11 | T-011 | OK | TDD: 2 tests de pytest y 6 en Chromium (mapeo de icono y texto a layout y paint, inyección de `glyphs` en el estilo transparente en sus dos formas de URL, texto sin tipografías que avisa y omite solo la etiqueta, imágenes antes de la capa y retiradas al desmontar, interactividad por defecto). `Map` gana `glyphs_url`, que es aditivo y no cambia ninguna firma de 0.1.0. 60 tests Python y 48 JSX en verde. |
