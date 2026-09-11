@@ -62,7 +62,12 @@ def _importable(asset_path: Any) -> str:
     return f"$/public{raw}"
 
 
-MAPCN_LIBRARY = _importable(_MAPCN_JS)
+# Inlined instead of ``_importable(_MAPCN_JS)``: `reflex component build`
+# copies module-level assignments into ``mapcn.pyi`` verbatim but drops
+# private helpers, so a call here would leave an undefined name in the stub.
+MAPCN_LIBRARY: str = getattr(_MAPCN_JS, "importable_path", None) or (
+    f"$/public{str(_MAPCN_JS).split('?', 1)[0]}"
+)
 
 #: npm package required by the JS module.
 MAPLIBRE_GL = "maplibre-gl@^6.3.0"
