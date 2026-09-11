@@ -63,7 +63,7 @@ Cuatro fases incrementales, cada una deployable (el paquete sigue instalable y l
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
 | F2-01 | `presets.py` (RasterPreset/TerrainPreset + tablas) y `helpers.py` (expresiones) + tests | 0.5d | — | ✔ 2026-09-11 |
-| F2-02 | `RasterLayer` JSX + `MapRasterLayer` Python (validación, preset ⊕ props) + tests | 0.75d | F1-02, F2-01 | ☐ |
+| F2-02 | `RasterLayer` JSX + `MapRasterLayer` Python (validación, preset ⊕ props) + tests | 0.75d | F1-02, F2-01 | ✔ 2026-09-11 |
 | F2-03 | `rainviewer_frames/tiles` (httpx, timeout, warning) + tests con mock | 0.5d | F2-01 | ☐ |
 | F2-04 | `Layer` JSX + `MapLayer` Python (source dict/str, validación) + tests | 0.75d | F1-02 | ☐ |
 | F2-05 | `HeatmapLayer` JSX + `MapHeatmapLayer` (+ `weight_property`, `max_zoom_fade`) + tests | 0.5d | F2-04 | ☐ |

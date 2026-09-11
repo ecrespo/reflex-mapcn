@@ -48,7 +48,7 @@
 
 ### Fase 2 — Componentes
 
-### T-006 · `map_raster_layer`
+### T-006 · `map_raster_layer` — `[x] 2026-09-11`
 - **Qué:** `RasterLayer` en JSX (source raster; paint `raster-*`; layout visibility; zoom range) sobre `useMapLayer`; clase `MapRasterLayer` con validación "uno de preset/tiles/url", fusión preset ⊕ props, `on_load_error` (COULD) con throttle 60 s.
 - **REQ:** REQ-RAS-001, 002, 003, 004, 005, 008, 009, 010, 011
 - **Archivos:** `mapcn.jsx`, `mapcn.py`, `tests/test_components.py`, `tests/js/test_raster.mjs`
@@ -225,6 +225,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-11 | T-006 | OK | TDD en dos frentes: 9 tests de pytest y 8 en Chromium, escritos antes del componente. Decisión de implementación: el rango de zoom sale de la clave de reconstrucción del hook (`sourceIdentity`), porque REQ-RAS-002 exige aplicarlo con `setLayerZoomRange` sin recrear la fuente; la fuente conserva su `maxzoom` nativo para que el sobre-zoom siga funcionando. 34 tests Python y 25 JSX en verde. |
 | 2026-09-11 | T-005 | OK | TDD: `tests/test_presets.py` y `tests/test_helpers.py` primero (rojo: módulos inexistentes), luego `presets.py` y `helpers.py`. 19 tests nuevos, 25 de pytest en total. Los helpers rechazan listas de stops vacías o no ascendentes, que MapLibre rechazaría en tiempo de estilo. |
 | 2026-09-11 | T-003, T-004 | OK | TDD: `tests/js/tests/layer_runtime.test.mjs` primero (rojo: no existía `useMapLayer`), luego el hook. 17/17 passing, ERRORS: none. Mutación de tres puntos del hook (setFilter, dedupe de advertencias, orden de limpieza) para comprobar que los tests discriminan; la primera versión del test de `before_id` no detectaba la mutación y se reforzó con una reconstrucción en frío. |
 | 2026-09-11 | T-001, T-002 | OK | Harness JSX versionado en `tests/js/` (stub MapLibre que registra llamadas y lanza donde lanza MapLibre, `render()` con act, runner Playwright). `bash tests/js/run.sh` → 2/2 passing, ERRORS: none. `ruff`, `compileall` y `pytest` (6) en verde. CHANGELOG ya existía desde 0.1.0. |

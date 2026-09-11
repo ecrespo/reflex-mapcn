@@ -6,6 +6,7 @@ React module itself is exercised by the demo app in a browser.
 
 from __future__ import annotations
 
+import pytest
 import reflex as rx
 import reflex_mapcn as mapcn
 
@@ -147,3 +148,89 @@ def test_camera_command_helper():
         "padding": 10,
         "seq": 3,
     }
+
+
+# ---------------------------------------------------------------------------
+# 0.2.0 layers
+# ---------------------------------------------------------------------------
+
+
+def _prop(component: rx.Component, name: str) -> str:
+    return str(getattr(component, name))
+
+
+def test_REQ_RAS_001_raster_layer_renders_inside_a_map():
+    rendered = _render(
+        mapcn.map(
+            mapcn.map_raster_layer(
+                id="radar",
+                tiles=["https://tiles.example.test/{z}/{x}/{y}.png"],
+                opacity=0.6,
+                before_id="waterway-name",
+            )
+        )
+    )
+    assert "MapcnRasterLayer" in rendered
+    assert "tiles" in rendered
+    assert "beforeId" in rendered
+
+
+def test_REQ_RAS_004_tile_size_scheme_and_attribution_reach_the_component():
+    layer = mapcn.map_raster_layer(
+        tiles=["https://tiles.example.test/{z}/{x}/{y}.png"],
+        tile_size=512,
+        scheme="tms",
+        attribution="© Example",
+    )
+    assert _prop(layer, "tile_size") == "512"
+    assert "tms" in _prop(layer, "scheme")
+    assert "Example" in _prop(layer, "attribution")
+
+
+def test_REQ_RAS_005_preset_fills_tiles_zoom_and_attribution():
+    layer = mapcn.map_raster_layer(preset="openseamap")
+    assert "tiles.openseamap.org" in _prop(layer, "tiles")
+    assert _prop(layer, "tile_size") == "256"
+    assert _prop(layer, "max_zoom") == "18"
+    assert "OpenSeaMap" in _prop(layer, "attribution")
+
+
+def test_REQ_RAS_005_an_explicit_prop_overrides_the_preset():
+    layer = mapcn.map_raster_layer(preset="openseamap", max_zoom=10, opacity=0.5)
+    assert _prop(layer, "max_zoom") == "10"
+    assert _prop(layer, "opacity") == "0.5"
+
+
+def test_REQ_RAS_005_the_preset_name_is_not_forwarded_to_javascript():
+    # Presets live in Python only: the JSX always receives resolved tiles.
+    rendered = _render(mapcn.map_raster_layer(preset="openseamap"))
+    assert "preset" not in rendered
+
+
+def test_REQ_RAS_005_an_unknown_preset_is_rejected_at_creation():
+    with pytest.raises(ValueError, match="unknown preset"):
+        mapcn.map_raster_layer(preset="not_a_preset")
+
+
+def test_REQ_RAS_001_a_layer_without_tiles_preset_or_url_is_rejected():
+    with pytest.raises(ValueError, match="provide preset, tiles or url"):
+        mapcn.map_raster_layer(opacity=0.5)
+
+
+def test_REQ_RAS_006_the_rainviewer_preset_demands_tiles_from_the_helper():
+    with pytest.raises(ValueError, match="rainviewer_tiles"):
+        mapcn.map_raster_layer(preset="rainviewer")
+
+    layer = mapcn.map_raster_layer(
+        preset="rainviewer", tiles=["https://tilecache.rainviewer.com/v2/{z}/{x}/{y}.png"]
+    )
+    assert _prop(layer, "max_zoom") == "7"
+
+
+def test_REQ_RAS_011_on_load_error_is_wired_as_an_event_handler():
+    rendered = _render(
+        mapcn.map(
+            mapcn.map_raster_layer(preset="openseamap", on_load_error=_State.on_geo)
+        )
+    )
+    assert "onLoadError" in rendered

@@ -2139,10 +2139,15 @@ function MapClusterLayer({
 
 const HOT_GROUPS = ["data", "paint", "layout", "filter", "zoomRange", "beforeId", "images"];
 
-/** The source without its payload: what a rebuild must watch. */
-function sourceWithoutData(source) {
+/**
+ * The part of a source that cannot change without recreating it.
+ *
+ * `data` is pushed with `setData`, and the zoom range is applied to the layer
+ * with `setLayerZoomRange`, so neither belongs in the rebuild key.
+ */
+function sourceIdentity(source) {
   if (!source) return null;
-  const { data, ...rest } = source;
+  const { data, minzoom, maxzoom, ...rest } = source;
   return rest;
 }
 
@@ -2208,7 +2213,7 @@ function useMapLayer({
     () =>
       JSON.stringify({
         sourceId,
-        source: sourceWithoutData(stableSource),
+        source: sourceIdentity(stableSource),
         layers: layerIdentity(resolvedLayers),
       }),
     [sourceId, stableSource, resolvedLayers],
@@ -2451,6 +2456,151 @@ function useMapLayer({
 }
 
 // ---------------------------------------------------------------------------
+// Raster layer (Reflex extra)
+// ---------------------------------------------------------------------------
+
+/** Component prop -> MapLibre paint property. */
+const RASTER_PAINT_PROPS = {
+  opacity: "raster-opacity",
+  resampling: "raster-resampling",
+  saturation: "raster-saturation",
+  contrast: "raster-contrast",
+  brightnessMin: "raster-brightness-min",
+  brightnessMax: "raster-brightness-max",
+  hueRotate: "raster-hue-rotate",
+  fadeDuration: "raster-fade-duration",
+};
+
+// A raster source has no `data` to push and no filter to set.
+const RASTER_HOT_KEYS = ["paint", "layout", "zoomRange", "beforeId"];
+
+// MapLibre reports every failed tile; one report a minute is enough to tell an
+// application that a service is down.
+const TILE_ERROR_THROTTLE_MS = 60000;
+
+/**
+ * Third-party raster tiles on top of the basemap: radar, railways, nautical
+ * charts, satellite imagery, traffic. Point it at a set of `{z}/{x}/{y}`
+ * templates or at a TileJSON url; the Python side resolves presets.
+ */
+function RasterLayer({
+  id: propId,
+  tiles,
+  url,
+  tileSize = 256,
+  scheme = "xyz",
+  bounds,
+  attribution,
+  minZoom,
+  maxZoom,
+  opacity,
+  resampling,
+  saturation,
+  contrast,
+  brightnessMin,
+  brightnessMax,
+  hueRotate,
+  fadeDuration,
+  visible = true,
+  beforeId,
+  onLoadError,
+}) {
+  const { map, isLoaded } = useMap();
+  const autoId = useId();
+  const id = propId ?? autoId;
+  const sourceId = `raster-source-${id}`;
+  const layerId = `raster-layer-${id}`;
+
+  const stableTiles = useStableValue(tiles);
+  const stableBounds = useStableValue(bounds);
+
+  const source = useMemo(
+    () => ({
+      type: "raster",
+      ...(stableTiles ? { tiles: stableTiles } : {}),
+      ...(url ? { url } : {}),
+      tileSize,
+      scheme,
+      ...(stableBounds ? { bounds: stableBounds } : {}),
+      ...(attribution ? { attribution } : {}),
+      ...(minZoom !== undefined ? { minzoom: minZoom } : {}),
+      ...(maxZoom !== undefined ? { maxzoom: maxZoom } : {}),
+    }),
+    [stableTiles, url, tileSize, scheme, stableBounds, attribution, minZoom, maxZoom],
+  );
+
+  const paint = useMemo(() => {
+    const values = {
+      opacity,
+      resampling,
+      saturation,
+      contrast,
+      brightnessMin,
+      brightnessMax,
+      hueRotate,
+      fadeDuration,
+    };
+    const result = {};
+    for (const [prop, name] of Object.entries(RASTER_PAINT_PROPS)) {
+      if (values[prop] !== undefined) result[name] = values[prop];
+    }
+    return result;
+  }, [
+    opacity,
+    resampling,
+    saturation,
+    contrast,
+    brightnessMin,
+    brightnessMax,
+    hueRotate,
+    fadeDuration,
+  ]);
+
+  const layers = useMemo(
+    () => [
+      {
+        id: layerId,
+        type: "raster",
+        paint,
+        layout: { visibility: visible ? "visible" : "none" },
+        ...(minZoom !== undefined ? { minzoom: minZoom } : {}),
+        ...(maxZoom !== undefined ? { maxzoom: maxZoom } : {}),
+      },
+    ],
+    [layerId, paint, visible, minZoom, maxZoom],
+  );
+
+  useMapLayer({ id, sourceId, source, layers, beforeId, hotKeys: RASTER_HOT_KEYS });
+
+  const onLoadErrorRef = useRef(onLoadError);
+  onLoadErrorRef.current = onLoadError;
+  const reportsErrors = !!onLoadError;
+
+  useEffect(() => {
+    if (!map || !isLoaded || !reportsErrors) return undefined;
+
+    let lastReport = 0;
+    const handleError = (event) => {
+      if (event?.sourceId !== sourceId) return;
+      const now = Date.now();
+      if (lastReport && now - lastReport < TILE_ERROR_THROTTLE_MS) return;
+      lastReport = now;
+      onLoadErrorRef.current?.({
+        source_id: sourceId,
+        message: event?.error?.message ?? "tile request failed",
+      });
+    };
+
+    map.on("error", handleError);
+    return () => {
+      map.off("error", handleError);
+    };
+  }, [map, isLoaded, sourceId, reportsErrors]);
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Reflex helpers
 // ---------------------------------------------------------------------------
 
@@ -2488,6 +2638,7 @@ export {
   Map,
   useMap,
   useMapLayer,
+  RasterLayer,
   MapMarker,
   MarkerContent,
   MarkerPopup,

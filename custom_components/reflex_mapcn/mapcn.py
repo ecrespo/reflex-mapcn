@@ -38,6 +38,8 @@ import reflex as rx
 from reflex.components.component import NoSSRComponent
 from reflex.event import passthrough_event_spec
 
+from .presets import RASTER_PRESETS
+
 # ---------------------------------------------------------------------------
 # Assets
 # ---------------------------------------------------------------------------
@@ -524,6 +526,99 @@ class MapClusterLayer(MapcnComponent):
 
 
 # ---------------------------------------------------------------------------
+# 0.2.0 layers (Reflex extras, not part of mapcn upstream)
+# ---------------------------------------------------------------------------
+
+
+class RasterLoadError(TypedDict):
+    """Payload of ``map_raster_layer.on_load_error``."""
+
+    source_id: str
+    message: str
+
+
+class MapRasterLayer(MapcnComponent):
+    """Third-party raster tiles on top of the basemap (Reflex extra).
+
+    Radar, railways, nautical charts, satellite imagery or a traffic service of
+    your own: anything published as ``{z}/{x}/{y}`` tiles or as TileJSON.
+
+    Pass ``preset`` for a service that needs no API key, or ``tiles`` / ``url``
+    for any other. A preset only fills in what you leave out::
+
+        mapcn.map_raster_layer(preset="openseamap", opacity=0.9)
+        mapcn.map_raster_layer(
+            tiles=[f"https://api.example.com/{{z}}/{{x}}/{{y}}.png?key={KEY}"],
+            attribution="© Example",
+        )
+
+    Presets live in ``reflex_mapcn.presets`` so you can read them, copy them and
+    check the attribution each service requires. ``preset="rainviewer"`` is the
+    exception: radar frame paths expire, so build the tiles with
+    ``rainviewer_tiles()`` and pass them explicitly.
+    """
+
+    tag = "RasterLayer"
+    alias = "MapcnRasterLayer"
+
+    # Tile templates, e.g. ["https://host/{z}/{x}/{y}.png"].
+    tiles: rx.Var[list[str]]
+    # TileJSON url, as an alternative to `tiles`.
+    url: rx.Var[str]
+    tile_size: rx.Var[Literal[256, 512]]
+    scheme: rx.Var[Literal["xyz", "tms"]]
+    min_zoom: rx.Var[int]
+    max_zoom: rx.Var[int]
+    # [west, south, east, north]: stops requests outside the covered area.
+    bounds: rx.Var[list[float]]
+    # Rendered by MapLibre in the attribution control; HTML is allowed.
+    attribution: rx.Var[str]
+
+    # ---- paint (applied without recreating the source) -------------------
+
+    opacity: rx.Var[float]
+    resampling: rx.Var[Literal["linear", "nearest"]]
+    saturation: rx.Var[float]
+    contrast: rx.Var[float]
+    brightness_min: rx.Var[float]
+    brightness_max: rx.Var[float]
+    hue_rotate: rx.Var[float]
+    fade_duration: rx.Var[int]
+
+    visible: rx.Var[bool]
+    before_id: rx.Var[str]
+
+    # Fires at most once a minute while the tiles of this layer fail to load.
+    on_load_error: rx.EventHandler[passthrough_event_spec(RasterLoadError)]
+
+    @classmethod
+    def create(cls, *children, **props) -> rx.Component:
+        """Resolve the preset and reject a layer with nothing to render."""
+        preset_name = props.pop("preset", None)
+        if preset_name is not None:
+            preset = RASTER_PRESETS.get(preset_name)
+            if preset is None:
+                known = ", ".join(sorted(RASTER_PRESETS))
+                raise ValueError(
+                    f"map_raster_layer: unknown preset {preset_name!r} (known: {known})"
+                )
+            for key, value in preset.as_props().items():
+                if value in (None, []) or props.get(key) is not None:
+                    continue
+                props[key] = value
+            if preset.name == "rainviewer" and props.get("tiles") is None:
+                raise ValueError(
+                    "map_raster_layer: preset 'rainviewer' needs tiles built with "
+                    "rainviewer_tiles(); frame paths expire and cannot be hard-coded"
+                )
+
+        if props.get("tiles") is None and props.get("url") is None:
+            raise ValueError("map_raster_layer: provide preset, tiles or url")
+
+        return super().create(*children, **props)
+
+
+# ---------------------------------------------------------------------------
 # Reflex extra: imperative camera
 # ---------------------------------------------------------------------------
 
@@ -590,6 +685,7 @@ map_arc = MapArc.create
 map_geojson = MapGeoJSON.create
 map_cluster_layer = MapClusterLayer.create
 map_camera = MapCamera.create
+map_raster_layer = MapRasterLayer.create
 
 
 class MapcnNamespace(rx.ComponentNamespace):
@@ -629,8 +725,10 @@ __all__ = [
     "MapControls",
     "MapGeoJSON",
     "MapGeoJSONEvent",
+    "RasterLoadError",
     "MapMarker",
     "MapPopup",
+    "MapRasterLayer",
     "MapRoute",
     "MapViewport",
     "MapcnComponent",
@@ -650,6 +748,7 @@ __all__ = [
     "map_geojson",
     "map_marker",
     "map_popup",
+    "map_raster_layer",
     "map_route",
     "mapcn",
     "marker_content",
