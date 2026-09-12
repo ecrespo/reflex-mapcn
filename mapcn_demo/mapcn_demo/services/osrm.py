@@ -67,7 +67,13 @@ def _path(coordinates: list[Coordinate]) -> str:
 
 
 def _digest(text: str) -> str:
-    return hashlib.sha1(text.encode()).hexdigest()[:10]
+    """A short, stable tag for a list of destinations.
+
+    This only tells one cache entry from another, so it wants a fast hash
+    rather than a cryptographic one; blake2s takes the digest length as an
+    argument instead of being truncated afterwards.
+    """
+    return hashlib.blake2s(text.encode(), digest_size=5).hexdigest()
 
 
 def _batches(destinations: list[Coordinate], size: int) -> list[list[Coordinate]]:
