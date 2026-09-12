@@ -397,9 +397,14 @@ cd mapcn_demo && uv run reflex run
 
 Pages: basic map (controlled viewport, blank basemap, custom styles), markers,
 popups, controls, routes (progress, OSRM alternatives), arcs, GeoJSON,
-clusters, advanced (camera commands, event log, globe) and a full-country
+clusters, advanced (camera commands, event log, globe), a full-country
 Venezuela map (OpenFreeMap street-level basemap, state polygons served from
-`assets/`, capitals and main cities, state picker and camera fitting).
+`assets/`, capitals and main cities, driving times between capitals) and the
+seismic history of Venezuela from the USGS catalogue, with a time slider, a
+live feed, a density heatmap, the active faults and terrain relief.
+
+`mapcn_demo/README.md` documents every page, where its data comes from and
+under which licence.
 
 ## Development
 

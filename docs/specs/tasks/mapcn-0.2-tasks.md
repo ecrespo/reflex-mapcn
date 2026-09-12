@@ -135,11 +135,16 @@
   - Un estado insular puede ser origen: la matriz vuelve llena de huecos y cada fila dice "sin ruta" (REQ-TVJ-002), en vez de ocultar el panel.
   - Verificado contra el servidor real de OSRM el 2026-09-12: 22 filas desde Caracas, sin error, y ruta de 577 puntos a La Guaira. Falta solo la comprobación visual en el navegador, que entra en T-020.
 
-### T-019 · Docs de la demo y compile_check global
+### T-019 · Docs de la demo y compile_check global — `[x] 2026-09-12`
 - **Qué:** README de la demo (páginas, fuentes de datos, licencias), `.env.example` (variables opcionales: `TOMTOM_API_KEY`, `OPENWEATHER_API_KEY` para recetas), `compile_check` de todas las páginas.
 - **REQ:** Art. 5, Art. 7
 - **Depende de:** T-016..T-018
 - **Done:** `COMPILE OK`; README actualizado.
+- **Notas de revisión (2026-09-12):**
+  - El `compile_check` se implementa como `scripts/compile_check.py`: lee las rutas del registro de Reflex (`RegistrationContext`, que sustituye al `DECORATED_PAGES` obsoleto desde 0.9.9) y construye cada una. Imprime `COMPILE OK: 11 pages` y devuelve 1 nombrando la página rota. `tests/demo/test_compile.py` lo ejecuta, así que la puerta corre también en CI dentro de pytest, sin necesidad de `reflex export`.
+  - El README de la demo documenta las once páginas, dónde vive cada cosa y la licencia de cada fuente; el README raíz ahora apunta a él y menciona `/sismos` y los tiempos de viaje, que faltaban desde T-016.
+  - Dos afirmaciones se corrigieron tras comprobarlas: `OPENWEATHER_API_KEY` no alimenta ninguna receta escrita (solo `TOMTOM_API_KEY`), y el feed de sismos de la documentación de MapLibre es dato del USGS en dominio público, no BSD.
+  - Hallazgo fuera de tarea: `ruff format --check .` falla en cuatro archivos anteriores a T-018 (`presets.py`, `pages/sismos.py`, `tests/test_components.py`, `tests/test_helpers.py`), así que el trabajo de lint de CI viene en rojo desde T-005. No se toca aquí para no mezclarlo con la tarea; pendiente de decisión.
 
 ### Fase 4 — Hardening y release
 
@@ -231,6 +236,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-12 | T-019 | OK | TDD también para las docs: 13 tests escritos antes (cinco del compile_check, ocho del README y del `.env.example`), que fallaron por script y archivos inexistentes. El compile_check construye las once páginas y nombra la que rompe; un test lo comprueba con una página rota de mentira, para que el informe valga algo. Tres afirmaciones del README se corrigieron al verificarlas contra el código en vez de darlas por buenas. 169 tests Python en verde y `COMPILE OK: 11 pages`. Queda anotado que `ruff format --check` viene fallando en cuatro archivos previos. |
 | 2026-09-12 | T-018 | OK | TDD: 17 tests del cliente OSRM y 22 de la página, escritos antes del código, con dos respuestas reales guardadas como fixtures y sin red. Dos decisiones de implementación: `TravelRow` es un dataclass y no un `TypedDict`, porque `rx.foreach` sobre una lista de dataclasses es el patrón que ya usa `/routes` y el Data Model solo fija los campos; y la clave de caché de la matriz añade un digest de los destinos al `(perfil, origen)` de la spec, para que un segundo cálculo desde la misma capital hacia otra lista no lea tiempos ajenos. Un estado insular sí puede ser origen: la matriz vuelve llena de huecos y cada fila dice "sin ruta", que es justo lo que pide REQ-TVJ-002. Mutación de tres puntos (columna del origen, tamaño del lote, orden de las filas) para comprobar que los tests discriminan: los tres fallaron. 155 tests Python en verde; ruff y compileall también. Falta el benchmark de red real, que se verá en T-020. |
 | 2026-09-11 | Delta 2026-09-heatmap-filter, T-017 | OK | El Delta del filtro en el mapa de calor se aprobó (opción A), se implementó y se plegó a PRD (REQ-HEA-007) y API Spec §3.3. Después T-017: los cuatro interruptores. En vivo con bucle de 60 s y capa de anillo estático para las últimas 24 h (sin animación por estado, DD-009). Densidad con peso por magnitud y desvanecido en zoom 8, ya filtrada. Fallas desde el asset con color por tipo de desplazamiento y tooltip en hover. Relieve con el preset de AWS y sombreado. 6 tests nuevos; 116 tests Python y 57 JSX en verde; las 11 páginas renderizan. |
 | 2026-09-11 | T-016 | OK | TDD: 14 tests sobre funciones puras, porque un estado de Reflex no se puede instanciar fuera de la app; la lógica vive en funciones de módulo y el estado solo delega. Dos fallos reales encontrados por los tests: faltaba el manejador del interruptor de notables (Reflex ya no genera `set_*` implícitos) y el selector de profundidad devolvía la etiqueta en español en vez de la clave, con lo que la cláusula de profundidad nunca habría casado. Se añadió la nota de cobertura del catálogo (hallazgo A-12 del Analyze). Las 11 páginas de la demo renderizan sin error. 109 tests Python en verde. |
