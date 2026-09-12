@@ -10,8 +10,14 @@ something to build.
 From this directory, with the package installed in editable mode:
 
 ```bash
-uv run reflex run
+uv run --extra dev reflex run
 ```
+
+The `--extra dev` is not optional in practice. `uv run` syncs the project
+environment before it runs anything, and without the extra it syncs to the
+runtime dependencies alone: pytest, ruff and twine are uninstalled, and the
+next `uv run pytest` picks up whatever interpreter it finds instead. Running
+the demo should not cost you the test suite.
 
 The app then serves on <http://localhost:3000>. Every page works without
 credentials. The two keys in `.env.example` unlock three optional tile

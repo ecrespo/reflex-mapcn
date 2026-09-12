@@ -392,8 +392,11 @@ The repository contains a demo app that exercises every feature:
 git clone https://github.com/ecrespo/reflex-mapcn
 cd reflex-mapcn
 uv venv && uv pip install -e . && uv pip install -r mapcn_demo/requirements.txt
-cd mapcn_demo && uv run reflex run
+cd mapcn_demo && uv run --extra dev reflex run
 ```
+
+`uv run` syncs the environment first, so the `--extra dev` keeps the test
+tools installed; without it, starting the demo uninstalls them.
 
 Pages: basic map (controlled viewport, blank basemap, custom styles), markers,
 popups, controls, routes (progress, OSRM alternatives), arcs, GeoJSON,
