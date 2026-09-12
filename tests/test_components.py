@@ -192,7 +192,9 @@ def test_REQ_RAS_004_tile_size_scheme_and_attribution_reach_the_component():
 
 def test_REQ_RAS_005_preset_fills_tiles_zoom_and_attribution():
     layer = mapcn.map_raster_layer(preset="openseamap")
-    assert "tiles.openseamap.org" in _prop(layer, "tiles")
+    # Against the preset itself rather than a host spelled out here: the
+    # preset is the source of truth for what the layer should request.
+    assert mapcn.RASTER_PRESETS["openseamap"].tiles[0] in _prop(layer, "tiles")
     assert _prop(layer, "tile_size") == "256"
     assert _prop(layer, "max_zoom") == "18"
     assert "OpenSeaMap" in _prop(layer, "attribution")

@@ -180,7 +180,8 @@ def test_REQ_TVJ_003_the_page_credits_osrm_and_openstreetmap():
 def test_REQ_TVJ_003_the_credit_is_on_the_page_and_not_only_in_the_module():
     rendered = str(venezuela.venezuela_page().render())
 
-    assert "router.project-osrm.org" in rendered
+    assert "red vial de OpenStreetMap" in rendered
+    assert "OSRM" in rendered
 
 
 def test_the_page_is_still_a_reflex_component():

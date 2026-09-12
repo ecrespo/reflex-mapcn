@@ -8,6 +8,8 @@ network and without a Reflex app.
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 import reflex as rx
 from mapcn_demo.pages import raster
 from mapcn_demo.services import env as env_service
@@ -165,9 +167,11 @@ def test_REQ_RAS_006_the_radar_uses_the_newest_frame():
     tiles, label = raster.radar_tiles(FRAMES)
 
     assert len(tiles) == 1
-    assert "/v2/radar/1689999000/" in tiles[0]
-    assert tiles[0].startswith("https://tilecache.rainviewer.com")
-    assert "{z}/{x}/{y}" in tiles[0]
+    url = urlsplit(tiles[0])
+    assert url.scheme == "https"
+    assert url.netloc == urlsplit(FRAMES["host"]).netloc
+    assert url.path.startswith("/v2/radar/1689999000/")
+    assert "{z}/{x}/{y}" in url.path
     assert label
 
 

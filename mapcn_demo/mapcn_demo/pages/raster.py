@@ -15,7 +15,6 @@ from datetime import datetime, timezone
 
 import reflex as rx
 import reflex_mapcn as mapcn
-from reflex_mapcn import rainviewer_frames, rainviewer_tiles
 
 from ..layout import code, demo_frame, page, section
 from ..services import env as env_service
@@ -188,7 +187,7 @@ def radar_tiles(frames: dict) -> tuple[list[str], str]:
     if not past:
         return [], "El radar de RainViewer no devolvió fotogramas."
     frame = past[-1]
-    tiles = rainviewer_tiles(frame, frames.get("host", ""))
+    tiles = mapcn.rainviewer_tiles(frame, frames.get("host", ""))
     moment = datetime.fromtimestamp(int(frame["time"]), tz=timezone.utc)
     return tiles, f"Fotograma de las {moment:%H:%M} UTC"
 
@@ -318,6 +317,7 @@ class RasterState(rx.State):
         self.command = camera_for(source_by_key(self.source_key), self._seq)
         if self.source_key == "rainviewer" and not self.radar:
             return RasterState.load_radar
+        return None
 
     @rx.event(background=True)
     async def load_radar(self):
@@ -327,7 +327,7 @@ class RasterState(rx.State):
                 return
             self.radar_loading = True
 
-        frames = await asyncio.to_thread(rainviewer_frames)
+        frames = await asyncio.to_thread(mapcn.rainviewer_frames)
         tiles, note = radar_tiles(frames)
 
         async with self:

@@ -14,7 +14,6 @@ from zoneinfo import ZoneInfo
 
 import reflex as rx
 import reflex_mapcn as mapcn
-from reflex_mapcn import match
 
 from ..layout import page, section
 from ..services import usgs
@@ -70,7 +69,7 @@ HEATMAP_WEIGHT_RANGE = [4.0, 8.0]
 HEATMAP_MAX_ZOOM_FADE = 8
 
 # Faults: colour by the kind of movement, slate for anything unclassified.
-FAULT_COLOR = match("slip_type", SLIP_TYPE_COLORS, SLIP_TYPE_DEFAULT_COLOR)
+FAULT_COLOR = mapcn.match("slip_type", SLIP_TYPE_COLORS, SLIP_TYPE_DEFAULT_COLOR)
 
 TERRAIN_PRESET = "aws_terrarium"
 TERRAIN_EXAGGERATION = 1.3
@@ -326,6 +325,7 @@ class SismosState(rx.State):
         self.show_live = bool(value)
         if self.show_live:
             return SismosState.poll_live
+        return None
 
     @rx.event(background=True)
     async def poll_live(self):
