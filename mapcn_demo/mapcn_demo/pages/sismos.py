@@ -377,6 +377,7 @@ def _legend() -> rx.Component:
         rx.text("El radio crece con la magnitud", size="1", color=rx.color("gray", 11)),
         spacing="1",
         align="start",
+        width="100%",
         padding="10px 12px",
         border_radius="8px",
         background=rx.color("gray", 2),
@@ -671,12 +672,20 @@ def sismos_page() -> rx.Component:
             "Mueve el deslizador temporal o pulsa reproducir para ver la "
             "secuencia por años. Haz clic en un sismo para ver su ficha.",
             rx.hstack(
-                _controls(),
+                # Panel and legend share the left column: the map is tall
+                # enough that a legend under it would sit below the fold.
+                rx.vstack(
+                    _controls(),
+                    _legend(),
+                    spacing="3",
+                    align="start",
+                    width="320px",
+                    flex="0 0 auto",
+                ),
                 rx.box(_map(), flex="1", min_width="0"),
                 spacing="3",
                 align="start",
                 width="100%",
             ),
-            rx.hstack(_legend(), spacing="3", align="start"),
         ),
     )
