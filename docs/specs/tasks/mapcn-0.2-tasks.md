@@ -162,13 +162,26 @@
 
 ### Fase 4 — Hardening y release
 
-### T-020 · Revisión E2E manual
+### T-020 · Revisión E2E manual — `[x] 2026-09-12` (con H-03 abierto)
 - **Qué:** ejecutar checklist: claro/oscuro con todas las capas; cambiar estilo base con capas activas; navegar entre las 11 páginas y volver (sin errores `already exists`); `blank=True` + symbol con/sin `glyphs_url`; 10k puntos (fps); tamaño del histórico en Network.
 - **REQ:** REQ-*-008/009, REQ-PNT-004/007, RNF rendimiento
 - **Depende de:** T-019
 - **Done:** checklist rellenado en el registro de ejecución con resultados y capturas.
-- **Hallazgos de la revisión (en curso):**
+- **Checklist (2026-09-12, ejecutado con Playwright sobre `reflex run` y claves reales):**
+
+  | Comprobación | Resultado |
+  |---|---|
+  | Navegar las 12 páginas dos veces | Sin errores de consola en 24 cargas. Ningún `already exists`. Un solo aviso, del propio estilo Liberty de OpenFreeMap (`layers[boundary_3].filter[1]` espera número y recibe null), ajeno al paquete |
+  | Claro/oscuro en `/sismos` con las cinco capas opcionales | Cambia sin errores; un mapa y un canvas después del cambio, sin capas huérfanas |
+  | Cambio de estilo base con capas activas (`/venezuela`, cuatro basemaps) | Sin errores; un mapa y un canvas al terminar |
+  | `blank=True` + símbolos con `glyphs_url` | Lienzo transparente con iconos y etiquetas dibujados (captura `t020-blank2`) |
+  | 10 000 puntos en `map_circle_layer` (REQ-PNT-007, ≥ 30 fps) | **60 fps** sostenidos arrastrando y haciendo zoom; peor fotograma 16,8 ms. Medido en una página temporal de 10 000 puntos sintéticos, borrada después |
+  | Tiempo de filtro en `/sismos` (REQ-SIS-004, < 100 ms) | 103,3 / 85,5 / 62,6 ms en tres cambios seguidos del deslizador de magnitud, de extremo a extremo (tecla → estado → websocket → `setFilter` → repintado → contador). Ninguna tarea bloqueante por encima de 50 ms. El primero se pasa por poco |
+  | Tamaño del histórico (RNF ≤ 400 KB) | **FALLA: 1 089 KB** en un único fotograma de websocket. Ver H-03 |
+
+- **Hallazgos de la revisión:**
   - **H-01 (2026-09-12, corregido):** `/sismos` no mostraba el mapa. El contenedor medía 0 px de alto, sin errores en consola. Causa: `mapcn.css` fijaba `height: 100%` en `.mapcn-map`, misma especificidad que la clase en la que Reflex compila un `height=`, y ganaba la hoja del paquete; la página es la única que da el alto al mapa en vez de a un contenedor padre. El defecto venía de 0.1.0 y solo se ve cuando el padre no tiene alto propio. Arreglado moviendo el tamaño por defecto a una regla `:where(.mapcn-map)`, que no pesa nada, con dos tests nuevos en Chromium (`tests/js/tests/map_size.test.mjs`) que miden el alto computado con la regla del autor insertada antes que la del paquete. Verificado en la app: 3555 sismos dibujados.
+  - **H-03 (2026-09-12, ABIERTO, requiere Delta):** el catálogo histórico pesa 1 089 KB al cruzar el websocket, contra el presupuesto de 400 KB del Tech Design §1 y del Data Model §6. El transporte no negocia compresión (`sec-websocket-extensions: none`), así que viaja en claro; comprimido serían 131 KB. El reparto medido sobre 3 555 eventos: `url` 236 KB, geometría 162, `place` 151, `time` 68, `id` duplicado en la feature y en las propiedades 59+59, `magType` 49, `recent` 49 (siempre `false` en el histórico), `depth` 43, `mag` 31. Opciones medidas: quitar `url` deja 859 KB; quitar además el id duplicado y `recent`, 744 KB; quitar también `place`, 590 KB; subir el mínimo por defecto a M ≥ 4,5 (1 621 eventos) deja 501 KB con el esquema actual, y ~340 KB combinado con el recorte. Recomendación: Delta que suba el mínimo a 4,5 —coherente con la nota de cobertura que ya muestra la página— y retire `url` (reconstruible desde `id`), el id duplicado y `recent` del histórico. Afecta al Data Model §3 y al API Spec §5.1, así que no se toca sin aprobar el Delta.
   - **H-02 (2026-09-12, pendiente de decisión):** `uv run reflex run` sincroniza el entorno sin el extra `dev` y deja el `.venv` sin pytest ni ruff. Conviene documentar `uv run --extra dev reflex run`, o arrancar la demo desde su propio entorno.
 
 ### T-021 · Plegar specs y CHANGELOG 0.2.0
@@ -253,6 +266,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-12 | T-020 | OK con un fallo | Checklist ejecutado sobre la app real con Playwright, no a ojo: 24 cargas de página sin errores, tema y estilos sin capas huérfanas, lienzo transparente con etiquetas, 60 fps con 10 000 puntos y filtro en 63–103 ms. El presupuesto del histórico no se cumple: 1 089 KB frente a 400, medido en el fotograma del websocket, que además no negocia compresión. Queda como H-03 con las cinco opciones medidas y una recomendación. Durante la revisión apareció un fallo propio en la página nueva: el interruptor de basemap transparente no hacía nada porque el mapa fijaba `styles`, que tiene precedencia sobre `blank`; corregido con test. |
 | 2026-09-12 | T-023 | OK | TDD: 26 tests escritos antes del código (lector de `.env`, registro de fuentes, plantillas con clave, radar, datos de símbolos, vistas por fuente). El test de documentación de T-019 hizo su trabajo solo: falló en cuanto la página entró en el menú y el README no la nombraba. Dos hallazgos medidos durante la verificación en el navegador, no supuestos: TomTom no tiene datos sobre Venezuela y el estilo `relative0` no pinta casi nada fuera de hora punta. La demo ya ejercita los seis componentes de 0.2. 196 tests Python, 59 JSX, `COMPILE OK: 12 pages`. |
 | 2026-09-12 | T-019 | OK | TDD también para las docs: 13 tests escritos antes (cinco del compile_check, ocho del README y del `.env.example`), que fallaron por script y archivos inexistentes. El compile_check construye las once páginas y nombra la que rompe; un test lo comprueba con una página rota de mentira, para que el informe valga algo. Tres afirmaciones del README se corrigieron al verificarlas contra el código en vez de darlas por buenas. 169 tests Python en verde y `COMPILE OK: 11 pages`. Queda anotado que `ruff format --check` viene fallando en cuatro archivos previos. |
 | 2026-09-12 | T-018 | OK | TDD: 17 tests del cliente OSRM y 22 de la página, escritos antes del código, con dos respuestas reales guardadas como fixtures y sin red. Dos decisiones de implementación: `TravelRow` es un dataclass y no un `TypedDict`, porque `rx.foreach` sobre una lista de dataclasses es el patrón que ya usa `/routes` y el Data Model solo fija los campos; y la clave de caché de la matriz añade un digest de los destinos al `(perfil, origen)` de la spec, para que un segundo cálculo desde la misma capital hacia otra lista no lea tiempos ajenos. Un estado insular sí puede ser origen: la matriz vuelve llena de huecos y cada fila dice "sin ruta", que es justo lo que pide REQ-TVJ-002. Mutación de tres puntos (columna del origen, tamaño del lote, orden de las filas) para comprobar que los tests discriminan: los tres fallaron. 155 tests Python en verde; ruff y compileall también. Falta el benchmark de red real, que se verá en T-020. |

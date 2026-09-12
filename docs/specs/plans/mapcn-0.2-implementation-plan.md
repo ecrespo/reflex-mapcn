@@ -101,8 +101,8 @@ Cuatro fases incrementales, cada una deployable (el paquete sigue instalable y l
 
 | ID | Tarea | Estimación | Dependencia | Estado |
 |---|---|---|---|---|
-| F4-01 | Revisión manual E2E (checklist §7) en claro/oscuro, cambio de estilo con capas activas, navegación entre páginas | 0.5d | Fase 3 | ☐ |
-| F4-02 | Rendimiento: 10k puntos (REQ-PNT-007), tamaño del histórico ≤ 400 KB, tiempo de filtro < 100 ms | 0.25d | F3-03 | ☐ |
+| F4-01 | Revisión manual E2E (checklist §7) en claro/oscuro, cambio de estilo con capas activas, navegación entre páginas | 0.5d | Fase 3 | ✔ 2026-09-12 |
+| F4-02 | Rendimiento: 10k puntos (REQ-PNT-007), tamaño del histórico ≤ 400 KB, tiempo de filtro < 100 ms | 0.25d | F3-03 | ✔ 2026-09-12 con H-03 abierto (histórico 1 089 KB) |
 | F4-03 | Docs finales: README (componentes, presets, atribuciones, recetas tráfico/POIs), CHANGELOG 0.2.0, `.env.example` | 0.5d | F4-01 | ☐ |
 | F4-04 | Plegar specs: marcar PRD/API/Tech/Data como `APPROVED`+`IMPLEMENTED`, actualizar Tasks (registro de ejecución) | 0.25d | F4-03 | ☐ |
 | F4-05 | `bump_version 0.2.0`, `reflex component build`, `uv publish`, tag `v0.2.0`, `reflex component share` (preview `/sismos`) | 0.5d | F4-04 | ☐ |

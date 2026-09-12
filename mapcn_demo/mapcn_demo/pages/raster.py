@@ -193,6 +193,18 @@ def radar_tiles(frames: dict) -> tuple[list[str], str]:
     return tiles, f"Fotograma de las {moment:%H:%M} UTC"
 
 
+def styles_for(blank: bool) -> dict:
+    """The basemap of the symbol map.
+
+    An explicit ``styles`` wins over ``blank`` in the component, so the map
+    has to stop asking for one while the transparent canvas is selected. An
+    empty mapping is how the component is told there is no custom style.
+    """
+    if blank:
+        return {}
+    return {"light": BASE_STYLE, "dark": BASE_STYLE}
+
+
 def view_for(source: Source) -> dict:
     """Where to stand to see this service."""
     center = source.center or tuple(VENEZUELA_CENTER)
@@ -288,6 +300,10 @@ class RasterState(rx.State):
     @rx.var
     def attribution(self) -> str:
         return source_by_key(self.source_key).attribution or ""
+
+    @rx.var
+    def symbol_styles(self) -> dict:
+        return styles_for(self.blank_basemap)
 
     @rx.var
     def opacity_label(self) -> str:
@@ -470,7 +486,7 @@ def _symbol_map() -> rx.Component:
         zoom=5.2,
         blank=RasterState.blank_basemap,
         glyphs_url=GLYPHS_URL,
-        styles={"light": BASE_STYLE, "dark": BASE_STYLE},
+        styles=RasterState.symbol_styles,
     )
 
 

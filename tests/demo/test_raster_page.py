@@ -274,3 +274,14 @@ def test_selecting_a_source_hands_the_camera_a_command():
     assert command["type"] == "flyTo"
     assert command["seq"] == 3
     assert command["zoom"] >= 10
+
+
+def test_REQ_PNT_005_the_blank_switch_stops_forcing_a_style():
+    # An explicit `styles` wins over `blank` in the component, so a map that
+    # always passes one would ignore the switch. An empty mapping is how the
+    # component is told there is no custom style.
+    assert raster.styles_for(blank=True) == {}
+    assert raster.styles_for(blank=False) == {
+        "light": raster.BASE_STYLE,
+        "dark": raster.BASE_STYLE,
+    }
