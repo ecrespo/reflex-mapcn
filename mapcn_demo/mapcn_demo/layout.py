@@ -13,6 +13,7 @@ NAV = [
     ("Arcs", "/arcs", "globe"),
     ("GeoJSON", "/geojson", "layers"),
     ("Clusters", "/clusters", "circle-dot"),
+    ("Raster", "/raster", "image"),
     ("Advanced", "/advanced", "settings-2"),
     ("Venezuela", "/venezuela", "flag"),
     ("Sismos", "/sismos", "activity"),

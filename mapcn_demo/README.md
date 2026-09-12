@@ -13,11 +13,10 @@ From this directory, with the package installed in editable mode:
 uv run reflex run
 ```
 
-The app then serves on <http://localhost:3000>. No API key is needed for any
-page. The two keys in `.env.example` are for the raster-layer recipes of the
-root README, which pull tiles from a provider of your own: TomTom for the
-traffic recipe written there, OpenWeather for the same pattern with weather
-tiles.
+The app then serves on <http://localhost:3000>. Every page works without
+credentials. The two keys in `.env.example` unlock three optional tile
+services on the raster page: copy that file to `.env`, fill in what you have,
+and restart. Anything already exported in the shell wins over the file.
 
 To build every page without a browser, from the repository root:
 
@@ -39,6 +38,7 @@ It prints one line per route and ends in `COMPILE OK`.
 | Arcs | `/arcs` | `map_arc` drawing curved connections on the globe projection. |
 | GeoJSON | `/geojson` | `map_geojson` rendering a FeatureCollection as fill and outline, with hover highlighting through `promote_id`. |
 | Clusters | `/clusters` | `map_cluster_layer` over MapLibre's native clustering, on a few thousand earthquakes. |
+| Raster | `/raster` | `map_raster_layer` over one tile service at a time: three presets that need no key, the RainViewer radar, and TomTom traffic or OpenWeather behind their own. A second map draws `map_symbol_layer` icons and labels. |
 | Advanced | `/advanced` | The Reflex extras: `map_camera` driven from state, lifecycle events and the globe projection. |
 | Venezuela | `/venezuela` | The country at street level: state polygons, city markers, and driving times from one capital to the others with the chosen route drawn. |
 | Sismos | `/sismos` | The USGS seismic history of Venezuela with a time slider, a live feed, a density heatmap, the active faults and terrain relief. |
@@ -74,6 +74,10 @@ their data through the backend, as the project constitution requires.
 | Apache Superset country-map plugin | `assets/venezuela_estados.geojson`, the state polygons | Apache-2.0 |
 | [Natural Earth](https://www.naturalearthdata.com/) via jsDelivr | The world map of `/geojson` | Public domain |
 | The sample earthquake feed of the MapLibre documentation, which is USGS data | The clustering demo of `/clusters` | Public domain (US government work) |
+| [OpenRailwayMap](https://www.openrailwaymap.org/) and [OpenSeaMap](https://www.openseamap.org/) | Two of the presets on `/raster` | ODbL 1.0, data from OpenStreetMap |
+| Esri World Imagery | The satellite preset on `/raster` | Esri's own terms |
+| [RainViewer](https://www.rainviewer.com/) | The radar on `/raster` | Free for non-commercial use |
+| TomTom traffic and OpenWeather map tiles | `/raster`, only with a key of your own | Each provider's own terms; both have a free tier |
 | AWS Terrain Tiles, terrarium encoding | The relief switch of `/sismos` | Open data; the preset carries the attribution "Terrain: Mapzen/AWS Terrain Tiles" |
 
 The attribution that a licence requires is shown on the page that uses the
