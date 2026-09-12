@@ -106,7 +106,14 @@ jobs:
           import reflex_mapcn as mapcn
 
           bundled = {path.name for path in resources.files("reflex_mapcn").iterdir()}
-          for required in ("mapcn.jsx", "mapcn.css", "mapcn.pyi", "py.typed"):
+          for required in (
+              "mapcn.jsx",
+              "mapcn.css",
+              "mapcn.pyi",
+              "py.typed",
+              "presets.py",
+              "helpers.py",
+          ):
               assert required in bundled, f"{required} missing from the wheel"
 
           rendered = str(

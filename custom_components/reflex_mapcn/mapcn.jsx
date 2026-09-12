@@ -72,6 +72,18 @@ const blankMapStyle = {
   ],
 };
 
+/**
+ * Build the `glyphs` entry of a style from a font server url.
+ *
+ * Both spellings are accepted: a base url, or one that already carries the
+ * `{fontstack}` and `{range}` placeholders.
+ */
+function glyphsTemplate(url) {
+  if (!url) return undefined;
+  if (url.includes("{fontstack}")) return url;
+  return `${url.replace(/\/$/, "")}/{fontstack}/{range}.pbf`;
+}
+
 // Prevent equivalent inline objects from triggering effects / style reloads.
 function useStableValue(value) {
   const key = useMemo(() => JSON.stringify(value) ?? "", [value]);
@@ -198,12 +210,17 @@ function DefaultLoader() {
 
 function getViewport(map) {
   const center = map.getCenter();
-  return {
+  const viewport = {
     center: [center.lng, center.lat],
     zoom: map.getZoom(),
     bearing: map.getBearing(),
     pitch: map.getPitch(),
   };
+  // With terrain on, the centre has a height worth reporting.
+  if (map.getTerrain?.()) {
+    viewport.elevation = map.queryTerrainElevation?.(center) ?? null;
+  }
+  return viewport;
 }
 
 /** Keys that are Reflex/React concerns and must never reach MapLibre. */
@@ -221,6 +238,7 @@ const Map = forwardRef(function Map(
     theme: themeProp,
     styles,
     blank = false,
+    glyphsUrl,
     projection,
     viewport,
     onViewportChange,
@@ -239,6 +257,7 @@ const Map = forwardRef(function Map(
   const [isStyleLoaded, setIsStyleLoaded] = useState(false);
   const [pendingStyle, setPendingStyle] = useState(null);
   const currentStyleRef = useRef(null);
+  const terrainRef = useRef(null);
   const styleSwapInFlightRef = useRef(false);
   const internalUpdateRef = useRef(false);
   const resolvedTheme = useResolvedTheme(themeProp);
@@ -260,9 +279,14 @@ const Map = forwardRef(function Map(
         light: stableStyles.light ?? defaultStyles.light,
       };
     }
-    if (blank) return { dark: blankMapStyle, light: blankMapStyle };
+    if (blank) {
+      const style = glyphsUrl
+        ? { ...blankMapStyle, glyphs: glyphsTemplate(glyphsUrl) }
+        : blankMapStyle;
+      return { dark: style, light: style };
+    }
     return defaultStyles;
-  }, [stableStyles, blank]);
+  }, [stableStyles, blank, glyphsUrl]);
 
   useImperativeHandle(ref, () => mapInstance, [mapInstance]);
 
@@ -397,6 +421,7 @@ const Map = forwardRef(function Map(
       map: mapInstance,
       isLoaded: isLoaded && isStyleLoaded,
       resolvedTheme,
+      terrainRef,
     }),
     [mapInstance, isLoaded, isStyleLoaded, resolvedTheme],
   );
@@ -2113,6 +2138,1073 @@ function MapClusterLayer({
 }
 
 // ---------------------------------------------------------------------------
+// Layer runtime (Reflex extra)
+// ---------------------------------------------------------------------------
+
+/**
+ * Shared lifecycle for every 0.2.0 layer component.
+ *
+ * One place decides when a source and its layers are added, which prop changes
+ * can be applied in place and which ones need a rebuild, how interaction is
+ * wired, and in what order everything is torn down. The 0.1.0 components keep
+ * their hand-written effects; they move over in a later release.
+ *
+ * ```js
+ * useMapLayer({
+ *   id: "quakes",                                  // only used in warnings
+ *   sourceId: "circle-source-quakes",              // created, or reused when `source` is null
+ *   source: { type: "geojson", data },             // null to attach to an existing source
+ *   layers: [{ id: "circle-layer-quakes", type: "circle", paint, layout, filter }],
+ *   beforeId, interactive, hoverPaint, images,
+ *   hotKeys: ["data", "paint", "layout", "filter", "zoomRange", "beforeId", "images"],
+ *   callbacks: { onClick, onHover },
+ * });
+ * ```
+ */
+
+const HOT_GROUPS = ["data", "paint", "layout", "filter", "zoomRange", "beforeId", "images"];
+
+/**
+ * The part of a source that cannot change without recreating it.
+ *
+ * `data` is pushed with `setData`, and the zoom range is applied to the layer
+ * with `setLayerZoomRange`, so neither belongs in the rebuild key.
+ */
+function sourceIdentity(source) {
+  if (!source) return null;
+  const { data, minzoom, maxzoom, ...rest } = source;
+  return rest;
+}
+
+/** The part of a layer that cannot change without recreating it. */
+function layerIdentity(layers) {
+  return layers.map((layer) => ({
+    id: layer.id,
+    type: layer.type,
+    sourceLayer: layer["source-layer"] ?? null,
+  }));
+}
+
+function isSame(a, b) {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
+function useMapLayer({
+  id,
+  sourceId,
+  source,
+  layers = [],
+  beforeId,
+  interactive = false,
+  hoverPaint,
+  images,
+  hotKeys,
+  callbacks,
+}) {
+  const { map, isLoaded } = useMap();
+
+  const stableSource = useStableValue(source);
+  const stableLayers = useStableValue(layers);
+  const stableImages = useStableValue(images);
+  const stableHoverPaint = useStableValue(hoverPaint);
+  const stableHotKeys = useStableValue(hotKeys ?? HOT_GROUPS);
+
+  const callbacksRef = useRef(callbacks);
+  callbacksRef.current = callbacks ?? {};
+
+  // Warn at most once per message for the life of the component: a missing
+  // `before_id` must not fill the console on every state update.
+  const warnedRef = useRef(null);
+  if (warnedRef.current === null) warnedRef.current = new Set();
+  const warnOnce = useCallback((message) => {
+    if (warnedRef.current.has(message)) return;
+    warnedRef.current.add(message);
+    console.warn(message);
+  }, []);
+
+  const hot = useMemo(() => new Set(stableHotKeys), [stableHotKeys]);
+
+  const resolvedLayers = useMemo(() => {
+    if (!stableHoverPaint) return stableLayers;
+    return stableLayers.map((layer, index) =>
+      index === 0
+        ? { ...layer, paint: mergeHoverPaint(layer.paint ?? {}, stableHoverPaint) }
+        : layer,
+    );
+  }, [stableLayers, stableHoverPaint]);
+
+  // Everything the map cannot be told about after the fact.
+  const coldKey = useMemo(
+    () =>
+      JSON.stringify({
+        sourceId,
+        source: sourceIdentity(stableSource),
+        layers: layerIdentity(resolvedLayers),
+      }),
+    [sourceId, stableSource, resolvedLayers],
+  );
+
+  // Everything it can.
+  const snapshot = useCallback(
+    () => ({
+      data: stableSource?.data,
+      beforeId: beforeId ?? null,
+      layers: resolvedLayers.map((layer) => ({
+        paint: layer.paint ?? {},
+        layout: layer.layout ?? {},
+        filter: layer.filter ?? null,
+        minzoom: layer.minzoom ?? null,
+        maxzoom: layer.maxzoom ?? null,
+      })),
+    }),
+    [stableSource, resolvedLayers, beforeId],
+  );
+
+  const appliedRef = useRef(null);
+  const addedLayersRef = useRef([]);
+  const addedImagesRef = useRef([]);
+  const [retryToken, setRetryToken] = useState(0);
+
+  const loadImageInto = useCallback(
+    async (name, url) => {
+      try {
+        const image = await map.loadImage(url);
+        if (!map.hasImage(name)) map.addImage(name, image?.data ?? image);
+        if (!addedImagesRef.current.includes(name)) addedImagesRef.current.push(name);
+        return true;
+      } catch {
+        warnOnce(`mapcn: image "${name}" failed to load`);
+        return false;
+      }
+    },
+    [map, warnOnce],
+  );
+
+  // Add / rebuild.
+  useEffect(() => {
+    if (!map || !isLoaded) return undefined;
+
+    let cancelled = false;
+    let retryHandler = null;
+    const ownsSource = !!stableSource;
+
+    const addLayers = () => {
+      const target = resolveBeforeId(map, beforeId);
+      if (beforeId && !target) {
+        warnOnce(`mapcn: before_id "${beforeId}" not found; layer appended`);
+      }
+      for (const layer of resolvedLayers) {
+        if (map.getLayer(layer.id)) map.removeLayer(layer.id);
+        map.addLayer({ ...layer, ...(sourceId ? { source: sourceId } : {}) }, target);
+        addedLayersRef.current.push(layer.id);
+      }
+      appliedRef.current = snapshot();
+    };
+
+    const add = async () => {
+      if (ownsSource) {
+        // A leftover source means an aborted teardown or a double mount.
+        if (map.getSource(sourceId)) {
+          for (const layer of resolvedLayers) {
+            if (map.getLayer(layer.id)) map.removeLayer(layer.id);
+          }
+          map.removeSource(sourceId);
+        }
+        map.addSource(sourceId, stableSource);
+      } else if (sourceId && !map.getSource(sourceId)) {
+        // The style does not provide it (yet): skip the layer and try again
+        // when the next style finishes loading.
+        warnOnce(`mapcn: source "${sourceId}" not found`);
+        retryHandler = () => setRetryToken((token) => token + 1);
+        map.on("style.load", retryHandler);
+        return;
+      }
+
+      if (stableImages) {
+        await Promise.all(
+          Object.entries(stableImages).map(([name, url]) => loadImageInto(name, url)),
+        );
+        if (cancelled) return;
+      }
+
+      addLayers();
+    };
+
+    add();
+
+    return () => {
+      cancelled = true;
+      try {
+        if (retryHandler) map.off("style.load", retryHandler);
+        for (const layerId of [...addedLayersRef.current].reverse()) {
+          if (map.getLayer(layerId)) map.removeLayer(layerId);
+        }
+        if (ownsSource && map.getSource(sourceId)) map.removeSource(sourceId);
+        for (const name of addedImagesRef.current) {
+          if (map.hasImage(name)) map.removeImage(name);
+        }
+      } catch {
+        // The style may be mid-reload; MapLibre has already dropped these.
+      }
+      addedLayersRef.current = [];
+      addedImagesRef.current = [];
+      appliedRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, isLoaded, coldKey, retryToken]);
+
+  // Apply in place.
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+    const applied = appliedRef.current;
+    if (!applied) return;
+
+    const next = snapshot();
+
+    if (hot.has("data") && !isSame(next.data, applied.data)) {
+      map.getSource(sourceId)?.setData?.(next.data);
+    }
+
+    resolvedLayers.forEach((layer, index) => {
+      if (!map.getLayer(layer.id)) return;
+      const before = applied.layers[index] ?? {};
+      const after = next.layers[index];
+
+      if (hot.has("paint")) {
+        for (const [key, value] of Object.entries(after.paint)) {
+          if (!isSame(value, before.paint?.[key])) map.setPaintProperty(layer.id, key, value);
+        }
+      }
+      if (hot.has("layout")) {
+        for (const [key, value] of Object.entries(after.layout)) {
+          if (!isSame(value, before.layout?.[key])) map.setLayoutProperty(layer.id, key, value);
+        }
+      }
+      if (hot.has("filter") && !isSame(after.filter, before.filter)) {
+        map.setFilter(layer.id, after.filter ?? undefined);
+      }
+      if (
+        hot.has("zoomRange") &&
+        (after.minzoom !== before.minzoom || after.maxzoom !== before.maxzoom)
+      ) {
+        map.setLayerZoomRange(layer.id, after.minzoom ?? undefined, after.maxzoom ?? undefined);
+      }
+    });
+
+    if (hot.has("beforeId") && next.beforeId !== applied.beforeId) {
+      const target = resolveBeforeId(map, next.beforeId);
+      for (const layer of resolvedLayers) {
+        if (map.getLayer(layer.id)) map.moveLayer(layer.id, target);
+      }
+    }
+
+    if (hot.has("images")) {
+      const wanted = stableImages ?? {};
+      for (const name of [...addedImagesRef.current]) {
+        if (name in wanted) continue;
+        if (map.hasImage(name)) map.removeImage(name);
+        addedImagesRef.current = addedImagesRef.current.filter((entry) => entry !== name);
+      }
+      for (const [name, url] of Object.entries(wanted)) {
+        if (!addedImagesRef.current.includes(name)) loadImageInto(name, url);
+      }
+    }
+
+    appliedRef.current = next;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, isLoaded, snapshot, stableImages, hot, sourceId]);
+
+  // Interaction, bound to the first layer (the one hover paint applies to).
+  const hitLayerId = resolvedLayers[0]?.id;
+  useEffect(() => {
+    if (!map || !isLoaded || !interactive || !hitLayerId) return undefined;
+
+    let hoveredId = null;
+
+    const setHover = (next) => {
+      if (next === hoveredId) return;
+      const sourceExists = !!map.getSource(sourceId);
+      if (hoveredId != null && sourceExists) {
+        map.setFeatureState({ source: sourceId, id: hoveredId }, { hover: false });
+      }
+      hoveredId = next;
+      if (next != null && sourceExists) {
+        map.setFeatureState({ source: sourceId, id: next }, { hover: true });
+      }
+    };
+
+    const payload = (feature, event) => ({
+      feature: serializeFeature(feature),
+      longitude: event.lngLat.lng,
+      latitude: event.lngLat.lat,
+    });
+
+    const handleMouseMove = (event) => {
+      const feature = event.features?.[0];
+      if (!feature) return;
+      map.getCanvas().style.cursor = "pointer";
+      if (feature.id === hoveredId) return;
+      setHover(feature.id ?? null);
+      callbacksRef.current.onHover?.(payload(feature, event));
+    };
+
+    const handleMouseLeave = () => {
+      setHover(null);
+      map.getCanvas().style.cursor = "";
+      callbacksRef.current.onHover?.(null);
+    };
+
+    const handleClick = (event) => {
+      const feature = event.features?.[0];
+      if (!feature) return;
+      callbacksRef.current.onClick?.(payload(feature, event));
+    };
+
+    map.on("mousemove", hitLayerId, handleMouseMove);
+    map.on("mouseleave", hitLayerId, handleMouseLeave);
+    map.on("click", hitLayerId, handleClick);
+
+    return () => {
+      map.off("mousemove", hitLayerId, handleMouseMove);
+      map.off("mouseleave", hitLayerId, handleMouseLeave);
+      map.off("click", hitLayerId, handleClick);
+      setHover(null);
+      try {
+        map.getCanvas().style.cursor = "";
+      } catch {
+        // The map may already be gone.
+      }
+    };
+  }, [map, isLoaded, interactive, hitLayerId, sourceId]);
+
+  return { sourceId, layerIds: resolvedLayers.map((layer) => layer.id) };
+}
+
+// ---------------------------------------------------------------------------
+// Raster layer (Reflex extra)
+// ---------------------------------------------------------------------------
+
+/** Component prop -> MapLibre paint property. */
+const RASTER_PAINT_PROPS = {
+  opacity: "raster-opacity",
+  resampling: "raster-resampling",
+  saturation: "raster-saturation",
+  contrast: "raster-contrast",
+  brightnessMin: "raster-brightness-min",
+  brightnessMax: "raster-brightness-max",
+  hueRotate: "raster-hue-rotate",
+  fadeDuration: "raster-fade-duration",
+};
+
+// A raster source has no `data` to push and no filter to set.
+const RASTER_HOT_KEYS = ["paint", "layout", "zoomRange", "beforeId"];
+
+// MapLibre reports every failed tile; one report a minute is enough to tell an
+// application that a service is down.
+const TILE_ERROR_THROTTLE_MS = 60000;
+
+/**
+ * Report a failing tile service to the application, at most once a minute.
+ *
+ * MapLibre emits an error for every tile it cannot fetch; a page only needs to
+ * know that the service is down.
+ */
+function useTileErrorReporter(map, isLoaded, sourceId, onLoadError) {
+  const onLoadErrorRef = useRef(onLoadError);
+  onLoadErrorRef.current = onLoadError;
+  const reportsErrors = !!onLoadError;
+
+  useEffect(() => {
+    if (!map || !isLoaded || !reportsErrors) return undefined;
+
+    let lastReport = 0;
+    const handleError = (event) => {
+      if (event?.sourceId !== sourceId) return;
+      const now = Date.now();
+      if (lastReport && now - lastReport < TILE_ERROR_THROTTLE_MS) return;
+      lastReport = now;
+      onLoadErrorRef.current?.({
+        source_id: sourceId,
+        message: event?.error?.message ?? "tile request failed",
+      });
+    };
+
+    map.on("error", handleError);
+    return () => {
+      map.off("error", handleError);
+    };
+  }, [map, isLoaded, sourceId, reportsErrors]);
+}
+
+/**
+ * Third-party raster tiles on top of the basemap: radar, railways, nautical
+ * charts, satellite imagery, traffic. Point it at a set of `{z}/{x}/{y}`
+ * templates or at a TileJSON url; the Python side resolves presets.
+ */
+function RasterLayer({
+  id: propId,
+  tiles,
+  url,
+  tileSize = 256,
+  scheme = "xyz",
+  bounds,
+  attribution,
+  minZoom,
+  maxZoom,
+  opacity,
+  resampling,
+  saturation,
+  contrast,
+  brightnessMin,
+  brightnessMax,
+  hueRotate,
+  fadeDuration,
+  visible = true,
+  beforeId,
+  onLoadError,
+}) {
+  const { map, isLoaded } = useMap();
+  const autoId = useId();
+  const id = propId ?? autoId;
+  const sourceId = `raster-source-${id}`;
+  const layerId = `raster-layer-${id}`;
+
+  const stableTiles = useStableValue(tiles);
+  const stableBounds = useStableValue(bounds);
+
+  const source = useMemo(
+    () => ({
+      type: "raster",
+      ...(stableTiles ? { tiles: stableTiles } : {}),
+      ...(url ? { url } : {}),
+      tileSize,
+      scheme,
+      ...(stableBounds ? { bounds: stableBounds } : {}),
+      ...(attribution ? { attribution } : {}),
+      ...(minZoom !== undefined ? { minzoom: minZoom } : {}),
+      ...(maxZoom !== undefined ? { maxzoom: maxZoom } : {}),
+    }),
+    [stableTiles, url, tileSize, scheme, stableBounds, attribution, minZoom, maxZoom],
+  );
+
+  const paint = useMemo(() => {
+    const values = {
+      opacity,
+      resampling,
+      saturation,
+      contrast,
+      brightnessMin,
+      brightnessMax,
+      hueRotate,
+      fadeDuration,
+    };
+    const result = {};
+    for (const [prop, name] of Object.entries(RASTER_PAINT_PROPS)) {
+      if (values[prop] !== undefined) result[name] = values[prop];
+    }
+    return result;
+  }, [
+    opacity,
+    resampling,
+    saturation,
+    contrast,
+    brightnessMin,
+    brightnessMax,
+    hueRotate,
+    fadeDuration,
+  ]);
+
+  const layers = useMemo(
+    () => [
+      {
+        id: layerId,
+        type: "raster",
+        paint,
+        layout: { visibility: visible ? "visible" : "none" },
+        ...(minZoom !== undefined ? { minzoom: minZoom } : {}),
+        ...(maxZoom !== undefined ? { maxzoom: maxZoom } : {}),
+      },
+    ],
+    [layerId, paint, visible, minZoom, maxZoom],
+  );
+
+  useMapLayer({ id, sourceId, source, layers, beforeId, hotKeys: RASTER_HOT_KEYS });
+
+  useTileErrorReporter(map, isLoaded, sourceId, onLoadError);
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Generic layer (Reflex extra)
+// ---------------------------------------------------------------------------
+
+/**
+ * Any MapLibre source and layer, straight from Python.
+ *
+ * This is the escape hatch: whatever this package does not wrap yet, from
+ * extruded buildings over the basemap's own vector tiles to a video overlay,
+ * is one `map_layer` away. `source` is either a source specification or the id
+ * of a source the style already provides; the layer receives its id and its
+ * source automatically.
+ */
+function Layer({
+  id: propId,
+  source,
+  layer,
+  beforeId,
+  interactive = false,
+  hoverPaint,
+  visible = true,
+  onClick,
+  onHover,
+}) {
+  const autoId = useId();
+  const id = propId ?? autoId;
+
+  const stableSource = useStableValue(source);
+  const stableLayer = useStableValue(layer);
+
+  const usesStyleSource = typeof stableSource === "string";
+  const sourceId = usesStyleSource ? stableSource : `layer-source-${id}`;
+
+  const layers = useMemo(() => {
+    const { id: ignoredId, source: ignoredSource, layout, ...rest } = stableLayer ?? {};
+    return [
+      {
+        ...rest,
+        id: `layer-${id}`,
+        layout: {
+          ...(layout ?? {}),
+          visibility: visible ? (layout?.visibility ?? "visible") : "none",
+        },
+      },
+    ];
+  }, [stableLayer, id, visible]);
+
+  useMapLayer({
+    id,
+    sourceId,
+    source: usesStyleSource ? null : stableSource,
+    layers,
+    beforeId,
+    interactive,
+    hoverPaint,
+    callbacks: { onClick, onHover },
+  });
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Heatmap layer (Reflex extra)
+// ---------------------------------------------------------------------------
+
+// Defaults chosen so a heatmap is readable with nothing but `data`: both the
+// spread and the strength of a point grow as the map is zoomed in.
+const HEATMAP_DEFAULT_INTENSITY = ["interpolate", ["linear"], ["zoom"], 0, 1, 9, 3];
+const HEATMAP_DEFAULT_RADIUS = ["interpolate", ["linear"], ["zoom"], 0, 2, 9, 20];
+const HEATMAP_DEFAULT_COLOR = [
+  "interpolate",
+  ["linear"],
+  ["heatmap-density"],
+  0,
+  "rgba(59,130,246,0)",
+  0.2,
+  "rgb(59,130,246)",
+  0.4,
+  "rgb(34,197,94)",
+  0.6,
+  "rgb(250,204,21)",
+  0.8,
+  "rgb(249,115,22)",
+  1,
+  "rgb(239,68,68)",
+];
+
+// A heatmap is not interactive in MapLibre: it renders density, not features.
+const HEATMAP_HOT_KEYS = ["data", "paint", "layout", "filter", "zoomRange", "beforeId"];
+
+/** Point density as a heatmap. Feed it a point FeatureCollection or a url. */
+function HeatmapLayer({
+  id: propId,
+  data,
+  filter,
+  weight = 1,
+  intensity = HEATMAP_DEFAULT_INTENSITY,
+  radius = HEATMAP_DEFAULT_RADIUS,
+  color = HEATMAP_DEFAULT_COLOR,
+  opacity = 0.8,
+  visible = true,
+  beforeId,
+  minZoom,
+  maxZoom,
+}) {
+  const autoId = useId();
+  const id = propId ?? autoId;
+
+  const stableData = useStableValue(data);
+  const stableFilter = useStableValue(filter);
+  const stableWeight = useStableValue(weight);
+  const stableIntensity = useStableValue(intensity);
+  const stableRadius = useStableValue(radius);
+  const stableColor = useStableValue(color);
+  const stableOpacity = useStableValue(opacity);
+
+  const source = useMemo(
+    () => ({ type: "geojson", data: stableData }),
+    [stableData],
+  );
+
+  const layers = useMemo(
+    () => [
+      {
+        id: `heatmap-layer-${id}`,
+        type: "heatmap",
+        paint: {
+          "heatmap-weight": stableWeight,
+          "heatmap-intensity": stableIntensity,
+          "heatmap-radius": stableRadius,
+          "heatmap-color": stableColor,
+          "heatmap-opacity": stableOpacity,
+        },
+        layout: { visibility: visible ? "visible" : "none" },
+        ...(stableFilter ? { filter: stableFilter } : {}),
+        ...(minZoom !== undefined ? { minzoom: minZoom } : {}),
+        ...(maxZoom !== undefined ? { maxzoom: maxZoom } : {}),
+      },
+    ],
+    [
+      id,
+      stableFilter,
+      stableWeight,
+      stableIntensity,
+      stableRadius,
+      stableColor,
+      stableOpacity,
+      visible,
+      minZoom,
+      maxZoom,
+    ],
+  );
+
+  useMapLayer({
+    id,
+    sourceId: `heatmap-source-${id}`,
+    source,
+    layers,
+    beforeId,
+    hotKeys: HEATMAP_HOT_KEYS,
+  });
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Circle layer (Reflex extra)
+// ---------------------------------------------------------------------------
+
+/** Component prop -> MapLibre paint property. */
+const CIRCLE_PAINT_PROPS = {
+  radius: "circle-radius",
+  color: "circle-color",
+  opacity: "circle-opacity",
+  strokeColor: "circle-stroke-color",
+  strokeWidth: "circle-stroke-width",
+  strokeOpacity: "circle-stroke-opacity",
+  blur: "circle-blur",
+  pitchScale: "circle-pitch-scale",
+};
+
+/**
+ * Thousands of points drawn by the GPU, with radius and colour driven by the
+ * data. Every paint prop takes a number, a colour or a MapLibre expression, so
+ * "radius by magnitude, colour by depth" needs no JavaScript.
+ */
+function CircleLayer({
+  id: propId,
+  data,
+  promoteId,
+  radius = 5,
+  color = "#3b82f6",
+  opacity = 0.85,
+  strokeColor = "#ffffff",
+  strokeWidth = 1,
+  strokeOpacity,
+  blur,
+  pitchScale,
+  sortKey,
+  filter,
+  minZoom,
+  maxZoom,
+  cluster = false,
+  clusterRadius = 50,
+  clusterMaxZoom = 14,
+  interactive = true,
+  hoverPaint,
+  visible = true,
+  beforeId,
+  onClick,
+  onHover,
+}) {
+  const autoId = useId();
+  const id = propId ?? autoId;
+
+  const stableData = useStableValue(data);
+  const stableFilter = useStableValue(filter);
+  const stableSortKey = useStableValue(sortKey);
+  const stableHoverPaint = useStableValue(hoverPaint);
+  const paintValues = useStableValue({
+    radius,
+    color,
+    opacity,
+    strokeColor,
+    strokeWidth,
+    strokeOpacity,
+    blur,
+    pitchScale,
+  });
+
+  const source = useMemo(
+    () => ({
+      type: "geojson",
+      data: stableData,
+      ...(promoteId ? { promoteId } : {}),
+      ...(cluster
+        ? { cluster: true, clusterRadius, clusterMaxZoom }
+        : { cluster: false }),
+    }),
+    [stableData, promoteId, cluster, clusterRadius, clusterMaxZoom],
+  );
+
+  const layers = useMemo(() => {
+    const paint = {};
+    for (const [prop, name] of Object.entries(CIRCLE_PAINT_PROPS)) {
+      if (paintValues[prop] !== undefined) paint[name] = paintValues[prop];
+    }
+    return [
+      {
+        id: `circle-layer-${id}`,
+        type: "circle",
+        paint,
+        layout: {
+          visibility: visible ? "visible" : "none",
+          // circle-sort-key is layout, not paint: it decides draw order.
+          ...(stableSortKey !== undefined ? { "circle-sort-key": stableSortKey } : {}),
+        },
+        ...(stableFilter ? { filter: stableFilter } : {}),
+        ...(minZoom !== undefined ? { minzoom: minZoom } : {}),
+        ...(maxZoom !== undefined ? { maxzoom: maxZoom } : {}),
+      },
+    ];
+  }, [id, paintValues, stableSortKey, stableFilter, visible, minZoom, maxZoom]);
+
+  useMapLayer({
+    id,
+    sourceId: `circle-source-${id}`,
+    source,
+    layers,
+    beforeId,
+    interactive,
+    hoverPaint: stableHoverPaint,
+    callbacks: { onClick, onHover },
+  });
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Symbol layer (Reflex extra)
+// ---------------------------------------------------------------------------
+
+/** Component prop -> MapLibre layout property. */
+const SYMBOL_LAYOUT_PROPS = {
+  iconImage: "icon-image",
+  iconSize: "icon-size",
+  iconAnchor: "icon-anchor",
+  iconOffset: "icon-offset",
+  iconRotate: "icon-rotate",
+  iconAllowOverlap: "icon-allow-overlap",
+  textFont: "text-font",
+  textSize: "text-size",
+  textOffset: "text-offset",
+  textAnchor: "text-anchor",
+  textAllowOverlap: "text-allow-overlap",
+  textOptional: "text-optional",
+};
+
+/** Component prop -> MapLibre paint property. */
+const SYMBOL_PAINT_PROPS = {
+  iconOpacity: "icon-opacity",
+  textColor: "text-color",
+  textOpacity: "text-opacity",
+  textHaloColor: "text-halo-color",
+  textHaloWidth: "text-halo-width",
+};
+
+/**
+ * Icons and labels on point data.
+ *
+ * Labels need the style to declare where its fonts come from. The blank
+ * basemap does not, so asking for a label there would take the whole map down:
+ * the label is dropped with a warning instead, and `glyphs_url` on `Map` is
+ * the way to get it back.
+ */
+function SymbolLayer({
+  id: propId,
+  data,
+  promoteId,
+  images,
+  iconImage,
+  iconSize,
+  iconAnchor,
+  iconOffset,
+  iconRotate,
+  iconAllowOverlap,
+  iconOpacity,
+  textField,
+  textFont = ["Noto Sans Regular"],
+  textSize,
+  textOffset,
+  textAnchor,
+  textColor,
+  textOpacity,
+  textHaloColor,
+  textHaloWidth,
+  textAllowOverlap,
+  textOptional,
+  filter,
+  minZoom,
+  maxZoom,
+  interactive = true,
+  hoverPaint,
+  visible = true,
+  beforeId,
+  onClick,
+  onHover,
+}) {
+  const { map, isLoaded } = useMap();
+  const autoId = useId();
+  const id = propId ?? autoId;
+
+  const stableData = useStableValue(data);
+  const stableImages = useStableValue(images);
+  const stableFilter = useStableValue(filter);
+  const stableTextField = useStableValue(textField);
+  const stableHoverPaint = useStableValue(hoverPaint);
+  const layoutValues = useStableValue({
+    iconImage,
+    iconSize,
+    iconAnchor,
+    iconOffset,
+    iconRotate,
+    iconAllowOverlap,
+    textFont,
+    textSize,
+    textOffset,
+    textAnchor,
+    textAllowOverlap,
+    textOptional,
+  });
+  const paintValues = useStableValue({
+    iconOpacity,
+    textColor,
+    textOpacity,
+    textHaloColor,
+    textHaloWidth,
+  });
+
+  // Only the active style knows whether it can render text at all.
+  const hasGlyphs = useMemo(() => {
+    if (!map || !isLoaded) return false;
+    try {
+      return !!map.getStyle()?.glyphs;
+    } catch {
+      return false;
+    }
+  }, [map, isLoaded]);
+
+  const wantsText = stableTextField !== undefined && stableTextField !== null;
+  const dropsText = wantsText && !hasGlyphs;
+
+  const warnedRef = useRef(false);
+  useEffect(() => {
+    if (!isLoaded || !dropsText || warnedRef.current) return;
+    warnedRef.current = true;
+    console.warn("mapcn: symbol text needs style glyphs; pass glyphs_url to Map");
+  }, [isLoaded, dropsText]);
+
+  const source = useMemo(
+    () => ({
+      type: "geojson",
+      data: stableData,
+      ...(promoteId ? { promoteId } : {}),
+    }),
+    [stableData, promoteId],
+  );
+
+  const layers = useMemo(() => {
+    const layout = { visibility: visible ? "visible" : "none" };
+    for (const [prop, name] of Object.entries(SYMBOL_LAYOUT_PROPS)) {
+      if (layoutValues[prop] !== undefined) layout[name] = layoutValues[prop];
+    }
+    if (wantsText && !dropsText) layout["text-field"] = stableTextField;
+    else delete layout["text-font"];
+
+    const paint = {};
+    for (const [prop, name] of Object.entries(SYMBOL_PAINT_PROPS)) {
+      if (paintValues[prop] !== undefined) paint[name] = paintValues[prop];
+    }
+
+    return [
+      {
+        id: `symbol-layer-${id}`,
+        type: "symbol",
+        layout,
+        paint,
+        ...(stableFilter ? { filter: stableFilter } : {}),
+        ...(minZoom !== undefined ? { minzoom: minZoom } : {}),
+        ...(maxZoom !== undefined ? { maxzoom: maxZoom } : {}),
+      },
+    ];
+  }, [
+    id,
+    layoutValues,
+    paintValues,
+    stableTextField,
+    wantsText,
+    dropsText,
+    stableFilter,
+    visible,
+    minZoom,
+    maxZoom,
+  ]);
+
+  useMapLayer({
+    id,
+    sourceId: `symbol-source-${id}`,
+    source,
+    layers,
+    images: stableImages,
+    beforeId,
+    interactive,
+    hoverPaint: stableHoverPaint,
+    callbacks: { onClick, onHover },
+  });
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Terrain (Reflex extra)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_HILLSHADE_PAINT = { "hillshade-exaggeration": 0.5 };
+
+// The dem source feeds `setTerrain`; there is no layer unless hillshade is on.
+const TERRAIN_HOT_KEYS = ["paint", "layout", "beforeId"];
+
+/**
+ * 3D relief from elevation tiles, with optional hillshading.
+ *
+ * MapLibre supports one terrain per map. Mounting a second one replaces the
+ * first with a warning, and a component only switches terrain off if it is
+ * still the one that owns it, so a late unmount cannot undo what another
+ * component just set.
+ */
+function MapTerrain({
+  id: propId,
+  tiles,
+  url,
+  encoding = "terrarium",
+  tileSize = 256,
+  minZoom,
+  maxZoom,
+  attribution,
+  exaggeration = 1.0,
+  hillshade = false,
+  hillshadePaint,
+  visible = true,
+  beforeId,
+  onLoadError,
+}) {
+  const { map, isLoaded, terrainRef } = useMap();
+  const autoId = useId();
+  const id = propId ?? autoId;
+  const sourceId = `terrain-source-${id}`;
+
+  const stableTiles = useStableValue(tiles);
+  const stableHillshadePaint = useStableValue(hillshadePaint);
+
+  const source = useMemo(
+    () => ({
+      type: "raster-dem",
+      ...(stableTiles ? { tiles: stableTiles } : {}),
+      ...(url ? { url } : {}),
+      encoding,
+      tileSize,
+      ...(attribution ? { attribution } : {}),
+      ...(minZoom !== undefined ? { minzoom: minZoom } : {}),
+      ...(maxZoom !== undefined ? { maxzoom: maxZoom } : {}),
+    }),
+    [stableTiles, url, encoding, tileSize, attribution, minZoom, maxZoom],
+  );
+
+  const layers = useMemo(() => {
+    if (!hillshade) return [];
+    return [
+      {
+        id: `hillshade-layer-${id}`,
+        type: "hillshade",
+        paint: { ...DEFAULT_HILLSHADE_PAINT, ...(stableHillshadePaint ?? {}) },
+        layout: { visibility: visible ? "visible" : "none" },
+      },
+    ];
+  }, [hillshade, id, stableHillshadePaint, visible]);
+
+  useMapLayer({ id, sourceId, source, layers, beforeId, hotKeys: TERRAIN_HOT_KEYS });
+
+  const exaggerationRef = useRef(exaggeration);
+  exaggerationRef.current = exaggeration;
+
+  // Switch terrain on, and claim ownership of it.
+  useEffect(() => {
+    if (!map || !isLoaded || !visible) return undefined;
+    if (!map.getSource(sourceId)) return undefined;
+
+    const owner = terrainRef?.current;
+    if (owner && owner !== id) {
+      console.warn("mapcn: only one map_terrain per map is supported; replacing");
+    }
+    if (terrainRef) terrainRef.current = id;
+    map.setTerrain({ source: sourceId, exaggeration: exaggerationRef.current });
+
+    return () => {
+      // Another component may have taken over in the meantime.
+      if (terrainRef && terrainRef.current !== id) return;
+      try {
+        map.setTerrain(null);
+      } catch {
+        // The style may be mid-reload.
+      }
+      if (terrainRef) terrainRef.current = null;
+    };
+  }, [map, isLoaded, sourceId, visible, id, terrainRef]);
+
+  // Exaggeration is applied without touching the source.
+  useEffect(() => {
+    if (!map || !isLoaded || !visible) return;
+    if (terrainRef && terrainRef.current !== id) return;
+    if (!map.getTerrain?.()) return;
+    map.setTerrain({ source: sourceId, exaggeration });
+  }, [map, isLoaded, visible, id, sourceId, exaggeration, terrainRef]);
+
+  useTileErrorReporter(map, isLoaded, sourceId, onLoadError);
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Reflex helpers
 // ---------------------------------------------------------------------------
 
@@ -2149,6 +3241,13 @@ function MapCamera({ command }) {
 export {
   Map,
   useMap,
+  useMapLayer,
+  RasterLayer,
+  Layer,
+  HeatmapLayer,
+  CircleLayer,
+  SymbolLayer,
+  MapTerrain,
   MapMarker,
   MarkerContent,
   MarkerPopup,

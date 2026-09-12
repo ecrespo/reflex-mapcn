@@ -38,6 +38,9 @@ import reflex as rx
 from reflex.components.component import NoSSRComponent
 from reflex.event import passthrough_event_spec
 
+from .helpers import interpolate, zoom_interpolate
+from .presets import RASTER_PRESETS, TERRAIN_PRESETS
+
 # ---------------------------------------------------------------------------
 # Assets
 # ---------------------------------------------------------------------------
@@ -126,6 +129,11 @@ class MapGeoJSONEvent(TypedDict):
     feature: GeoJSONFeature
     longitude: float
     latitude: float
+
+
+#: 0.2.0 name of the layer feature payload. Same shape as ``MapGeoJSONEvent``
+#: (Analyze A-09): every layer component delivers one of these.
+LayerFeatureEvent = MapGeoJSONEvent
 
 
 class MapArcEvent(TypedDict):
@@ -231,6 +239,11 @@ class Map(MapcnComponent):
 
     # URL of the MapLibre web worker (defaults to unpkg CDN).
     worker_url: rx.Var[str]
+
+    # Font server for `map_symbol_layer` text on the blank basemap, e.g.
+    # "https://tiles.openfreemap.org/fonts". A url that already carries the
+    # {fontstack} and {range} placeholders is used as it is.
+    glyphs_url: rx.Var[str]
 
     # ---- Events ----------------------------------------------------------
 
@@ -524,6 +537,454 @@ class MapClusterLayer(MapcnComponent):
 
 
 # ---------------------------------------------------------------------------
+# 0.2.0 layers (Reflex extras, not part of mapcn upstream)
+# ---------------------------------------------------------------------------
+
+
+class RasterLoadError(TypedDict):
+    """Payload of ``map_raster_layer.on_load_error``."""
+
+    source_id: str
+    message: str
+
+
+class MapRasterLayer(MapcnComponent):
+    """Third-party raster tiles on top of the basemap (Reflex extra).
+
+    Radar, railways, nautical charts, satellite imagery or a traffic service of
+    your own: anything published as ``{z}/{x}/{y}`` tiles or as TileJSON.
+
+    Pass ``preset`` for a service that needs no API key, or ``tiles`` / ``url``
+    for any other. A preset only fills in what you leave out::
+
+        mapcn.map_raster_layer(preset="openseamap", opacity=0.9)
+        mapcn.map_raster_layer(
+            tiles=[f"https://api.example.com/{{z}}/{{x}}/{{y}}.png?key={KEY}"],
+            attribution="© Example",
+        )
+
+    Presets live in ``reflex_mapcn.presets`` so you can read them, copy them and
+    check the attribution each service requires. ``preset="rainviewer"`` is the
+    exception: radar frame paths expire, so build the tiles with
+    ``rainviewer_tiles()`` and pass them explicitly.
+    """
+
+    tag = "RasterLayer"
+    alias = "MapcnRasterLayer"
+
+    # Tile templates, e.g. ["https://host/{z}/{x}/{y}.png"].
+    tiles: rx.Var[list[str]]
+    # TileJSON url, as an alternative to `tiles`.
+    url: rx.Var[str]
+    tile_size: rx.Var[Literal[256, 512]]
+    scheme: rx.Var[Literal["xyz", "tms"]]
+    min_zoom: rx.Var[int]
+    max_zoom: rx.Var[int]
+    # [west, south, east, north]: stops requests outside the covered area.
+    bounds: rx.Var[list[float]]
+    # Rendered by MapLibre in the attribution control; HTML is allowed.
+    attribution: rx.Var[str]
+
+    # ---- paint (applied without recreating the source) -------------------
+
+    opacity: rx.Var[float]
+    resampling: rx.Var[Literal["linear", "nearest"]]
+    saturation: rx.Var[float]
+    contrast: rx.Var[float]
+    brightness_min: rx.Var[float]
+    brightness_max: rx.Var[float]
+    hue_rotate: rx.Var[float]
+    fade_duration: rx.Var[int]
+
+    visible: rx.Var[bool]
+    before_id: rx.Var[str]
+
+    # Fires at most once a minute while the tiles of this layer fail to load.
+    on_load_error: rx.EventHandler[passthrough_event_spec(RasterLoadError)]
+
+    @classmethod
+    def create(cls, *children, **props) -> rx.Component:
+        """Resolve the preset and reject a layer with nothing to render."""
+        preset_name = props.pop("preset", None)
+        if preset_name is not None:
+            preset = RASTER_PRESETS.get(preset_name)
+            if preset is None:
+                known = ", ".join(sorted(RASTER_PRESETS))
+                raise ValueError(
+                    f"map_raster_layer: unknown preset {preset_name!r} (known: {known})"
+                )
+            for key, value in preset.as_props().items():
+                if value in (None, []) or props.get(key) is not None:
+                    continue
+                props[key] = value
+            if preset.name == "rainviewer" and props.get("tiles") is None:
+                raise ValueError(
+                    "map_raster_layer: preset 'rainviewer' needs tiles built with "
+                    "rainviewer_tiles(); frame paths expire and cannot be hard-coded"
+                )
+
+        if props.get("tiles") is None and props.get("url") is None:
+            raise ValueError("map_raster_layer: provide preset, tiles or url")
+
+        return super().create(*children, **props)
+
+
+class MapLayer(MapcnComponent):
+    """Any MapLibre source and layer, declared from Python (Reflex extra).
+
+    The escape hatch for everything this package does not wrap yet::
+
+        # Extruded buildings over the basemap's own vector tiles.
+        mapcn.map_layer(
+            source="openmaptiles",
+            layer={
+                "type": "fill-extrusion",
+                "source-layer": "building",
+                "minzoom": 14,
+                "paint": {"fill-extrusion-height": ["get", "render_height"]},
+            },
+        )
+
+        # A GeoJSON file served by the app.
+        mapcn.map_layer(
+            source={"type": "geojson", "data": "/faults.geojson"},
+            layer={"type": "line", "paint": {"line-color": "#ef4444"}},
+            interactive=True,
+            on_hover=State.show_fault,
+        )
+
+    ``source`` is either a MapLibre source specification or the id of a source
+    the active style already provides. The layer gets its id and its source
+    injected, so leave both out. ``data``, ``paint``, ``layout`` and ``filter``
+    are applied without recreating the layer; anything else rebuilds it.
+
+    A source id the style does not provide is not an error: the layer is
+    skipped with a console warning and retried after the next style load.
+    """
+
+    tag = "Layer"
+    alias = "MapcnLayer"
+
+    # A MapLibre source specification, or the id of an existing source.
+    source: rx.Var[dict[str, Any] | str]
+    # A MapLibre layer specification without `id` and `source`.
+    layer: rx.Var[dict[str, Any]]
+    before_id: rx.Var[str]
+    # Off by default: a generic layer may well be raster or background.
+    interactive: rx.Var[bool]
+    # Merged over `layer.paint` behind `feature-state.hover`.
+    hover_paint: rx.Var[dict[str, Any]]
+    visible: rx.Var[bool]
+
+    on_click: rx.EventHandler[passthrough_event_spec(LayerFeatureEvent)]
+    # Receives the event, or None when the cursor leaves the layer.
+    on_hover: rx.EventHandler[passthrough_event_spec(LayerFeatureEvent)]
+
+    @classmethod
+    def create(cls, *children, **props) -> rx.Component:
+        """Reject a layer MapLibre would refuse, before the app compiles."""
+        source = props.get("source")
+        layer = props.get("layer")
+
+        if source is None:
+            raise ValueError("map_layer: source is required")
+        if layer is None:
+            raise ValueError("map_layer: layer is required")
+
+        # A Var only resolves in the browser; validating it here would reject
+        # perfectly good code.
+        if not isinstance(source, (rx.Var, dict, str)):
+            raise ValueError("map_layer: source must be a dict or a source id")
+        if isinstance(layer, dict) and not layer.get("type"):
+            raise ValueError("map_layer: layer.type is required")
+
+        return super().create(*children, **props)
+
+
+class MapHeatmapLayer(MapcnComponent):
+    """Point density as a heatmap (Reflex extra).
+
+    Feed it a point ``FeatureCollection`` or a url. The defaults are readable
+    on their own; ``weight_property`` and ``max_zoom_fade`` cover the two
+    things almost every heatmap needs::
+
+        mapcn.map_heatmap_layer(
+            data=State.quakes,
+            weight_property="mag",      # a magnitude 8 counts more than a 4
+            weight_range=[4.0, 8.0],
+            max_zoom_fade=8,            # hand over to the point layer at zoom 8
+        )
+
+    Every paint prop takes a number or a MapLibre expression. A heatmap is not
+    interactive in MapLibre, so it has no events.
+    """
+
+    tag = "HeatmapLayer"
+    alias = "MapcnHeatmapLayer"
+
+    data: rx.Var[dict[str, Any] | str]
+    # heatmap-weight: how much one point counts.
+    weight: rx.Var[float | list]
+    # heatmap-intensity: global multiplier, usually a function of the zoom.
+    intensity: rx.Var[float | list]
+    # heatmap-radius, in pixels.
+    radius: rx.Var[float | list]
+    # heatmap-color: a ramp over ["heatmap-density"].
+    color: rx.Var[list]
+    opacity: rx.Var[float | list]
+    # Applied in place, so a slider can drive the density without resending
+    # the data (delta 2026-09-heatmap-filter).
+    filter: rx.Var[list]
+    visible: rx.Var[bool]
+    before_id: rx.Var[str]
+    min_zoom: rx.Var[float]
+    max_zoom: rx.Var[float]
+
+    @classmethod
+    def create(cls, *children, **props) -> rx.Component:
+        """Turn the two Python-only shortcuts into MapLibre expressions."""
+        weight_property = props.pop("weight_property", None)
+        weight_range = props.pop("weight_range", None)
+        max_zoom_fade = props.pop("max_zoom_fade", None)
+
+        if props.get("data") is None:
+            raise ValueError("map_heatmap_layer: data is required")
+
+        if weight_property is not None and props.get("weight") is None:
+            if weight_range is None or len(weight_range) != 2:
+                raise ValueError(
+                    "map_heatmap_layer: weight_property needs weight_range=[min, max]"
+                )
+            low, high = weight_range
+            props["weight"] = interpolate(weight_property, [(low, 0), (high, 1)])
+
+        if max_zoom_fade is not None and props.get("opacity") is None:
+            # Fade out just before the zoom where a point layer takes over.
+            fade = [(max_zoom_fade - 1, 1), (max_zoom_fade, 0)]
+            props["opacity"] = zoom_interpolate(fade)
+
+        return super().create(*children, **props)
+
+
+class MapCircleLayer(MapcnComponent):
+    """Point data as GPU-drawn circles (Reflex extra).
+
+    The component to reach for when there are more points than markers can
+    carry: radius and colour follow the data, and thousands of features stay
+    smooth because nothing touches the DOM::
+
+        mapcn.map_circle_layer(
+            data=State.quakes,
+            promote_id="id",
+            radius=interpolate("mag", [(4, 4), (7, 24)]),
+            color=step("depth", "#ef4444", [(70, "#f97316"), (300, "#3b82f6")]),
+            filter=State.layer_filter,
+            hover_paint={"circle-stroke-width": 3},
+            on_click=State.select_quake,
+        )
+
+    Every paint prop takes a number, a colour or a MapLibre expression.
+    ``filter`` is applied in place, which is what makes a time slider feel
+    instant: the data stays in the browser and only the filter changes.
+
+    Interactive by default, unlike ``map_layer``: a point layer is almost
+    always meant to be clicked. Set ``promote_id`` so hover state survives
+    tile boundaries.
+    """
+
+    tag = "CircleLayer"
+    alias = "MapcnCircleLayer"
+
+    data: rx.Var[dict[str, Any] | str]
+    # Feature property promoted to the feature id, for stable hover state.
+    promote_id: rx.Var[str]
+
+    # ---- paint (number, colour or expression) ----------------------------
+
+    radius: rx.Var[float | list]
+    color: rx.Var[str | list]
+    opacity: rx.Var[float | list]
+    stroke_color: rx.Var[str | list]
+    stroke_width: rx.Var[float | list]
+    stroke_opacity: rx.Var[float | list]
+    blur: rx.Var[float | list]
+    pitch_scale: rx.Var[Literal["map", "viewport"]]
+    # Draw order within the layer (layout property).
+    sort_key: rx.Var[list | float]
+
+    # ---- selection and zoom ----------------------------------------------
+
+    filter: rx.Var[list]
+    min_zoom: rx.Var[float]
+    max_zoom: rx.Var[float]
+
+    # ---- clustering (source options) -------------------------------------
+
+    cluster: rx.Var[bool]
+    cluster_radius: rx.Var[int]
+    cluster_max_zoom: rx.Var[int]
+
+    # ---- interaction ------------------------------------------------------
+
+    interactive: rx.Var[bool]
+    # Merged over the paint behind `feature-state.hover`.
+    hover_paint: rx.Var[dict[str, Any]]
+    visible: rx.Var[bool]
+    before_id: rx.Var[str]
+
+    on_click: rx.EventHandler[passthrough_event_spec(LayerFeatureEvent)]
+    # Receives the event, or None when the cursor leaves the layer.
+    on_hover: rx.EventHandler[passthrough_event_spec(LayerFeatureEvent)]
+
+    @classmethod
+    def create(cls, *children, **props) -> rx.Component:
+        """Reject a layer with nothing to draw."""
+        if props.get("data") is None:
+            raise ValueError("map_circle_layer: data is required")
+        return super().create(*children, **props)
+
+
+class MapSymbolLayer(MapcnComponent):
+    """Icons and labels on point data (Reflex extra).
+
+    ::
+
+        mapcn.map_symbol_layer(
+            data=State.cities,
+            images={"pin": "/pin.png"},
+            icon_image="pin",
+            icon_allow_overlap=True,
+            text_field=["get", "name"],
+            text_offset=[0, 1.2],
+        )
+
+    ``images`` is loaded into the map before the layer is added and removed
+    with it; an image that fails to load is reported and skipped, and the rest
+    of the layer is drawn.
+
+    Labels need the style to declare where its fonts come from. The blank
+    basemap does not, so a label there is dropped with a console warning
+    instead of taking the map down: pass ``glyphs_url`` to ``map`` to get it
+    back. ``text_font`` must exist in those glyphs; OpenFreeMap serves
+    ``Noto Sans Regular`` (the default) and CARTO serves ``Open Sans Regular``.
+    """
+
+    tag = "SymbolLayer"
+    alias = "MapcnSymbolLayer"
+
+    data: rx.Var[dict[str, Any] | str]
+    promote_id: rx.Var[str]
+    # {"name": url or data URI}: loaded with the layer, removed with it.
+    images: rx.Var[dict[str, str]]
+
+    # ---- icon -------------------------------------------------------------
+
+    icon_image: rx.Var[str | list]
+    icon_size: rx.Var[float | list]
+    icon_anchor: rx.Var[str]
+    icon_offset: rx.Var[list[float]]
+    icon_rotate: rx.Var[float | list]
+    icon_allow_overlap: rx.Var[bool]
+    icon_opacity: rx.Var[float | list]
+
+    # ---- text -------------------------------------------------------------
+
+    text_field: rx.Var[str | list]
+    # Must exist in the glyphs of the active style.
+    text_font: rx.Var[list[str]]
+    text_size: rx.Var[float | list]
+    text_offset: rx.Var[list[float]]
+    text_anchor: rx.Var[str]
+    text_color: rx.Var[str | list]
+    text_opacity: rx.Var[float | list]
+    text_halo_color: rx.Var[str]
+    text_halo_width: rx.Var[float]
+    text_allow_overlap: rx.Var[bool]
+    text_optional: rx.Var[bool]
+
+    # ---- selection and interaction ---------------------------------------
+
+    filter: rx.Var[list]
+    min_zoom: rx.Var[float]
+    max_zoom: rx.Var[float]
+    interactive: rx.Var[bool]
+    hover_paint: rx.Var[dict[str, Any]]
+    visible: rx.Var[bool]
+    before_id: rx.Var[str]
+
+    on_click: rx.EventHandler[passthrough_event_spec(LayerFeatureEvent)]
+    # Receives the event, or None when the cursor leaves the layer.
+    on_hover: rx.EventHandler[passthrough_event_spec(LayerFeatureEvent)]
+
+    @classmethod
+    def create(cls, *children, **props) -> rx.Component:
+        """Reject a layer with nothing to draw."""
+        if props.get("data") is None:
+            raise ValueError("map_symbol_layer: data is required")
+        return super().create(*children, **props)
+
+
+class MapTerrain(MapcnComponent):
+    """3D relief from elevation tiles, with optional hillshading (Reflex extra).
+
+    ::
+
+        mapcn.map_terrain(preset="aws_terrarium", hillshade=True, exaggeration=1.3)
+
+    ``exaggeration`` is applied without rebuilding the elevation source, so it
+    can be driven from a slider. MapLibre supports one terrain per map:
+    mounting a second one replaces the first and says so in the console.
+
+    Pitch the map (``pitch=60``) to see the relief; hillshading alone is
+    visible from straight above.
+    """
+
+    tag = "MapTerrain"
+    alias = "MapcnMapTerrain"
+
+    tiles: rx.Var[list[str]]
+    url: rx.Var[str]
+    encoding: rx.Var[Literal["terrarium", "mapbox"]]
+    tile_size: rx.Var[int]
+    min_zoom: rx.Var[int]
+    max_zoom: rx.Var[int]
+    attribution: rx.Var[str]
+
+    # Vertical scale of the relief; applied without recreating the source.
+    exaggeration: rx.Var[float]
+    # Add a hillshade layer over the same elevation source.
+    hillshade: rx.Var[bool]
+    # Merged over {"hillshade-exaggeration": 0.5}.
+    hillshade_paint: rx.Var[dict[str, Any]]
+    visible: rx.Var[bool]
+    before_id: rx.Var[str]
+
+    # Fires at most once a minute while the elevation tiles fail to load.
+    on_load_error: rx.EventHandler[passthrough_event_spec(RasterLoadError)]
+
+    @classmethod
+    def create(cls, *children, **props) -> rx.Component:
+        """Resolve the preset and reject a terrain with no elevation source."""
+        preset_name = props.pop("preset", None)
+        if preset_name is not None:
+            preset = TERRAIN_PRESETS.get(preset_name)
+            if preset is None:
+                known = ", ".join(sorted(TERRAIN_PRESETS))
+                raise ValueError(
+                    f"map_terrain: unknown preset {preset_name!r} (known: {known})"
+                )
+            for key, value in preset.as_props().items():
+                if value in (None, []) or props.get(key) is not None:
+                    continue
+                props[key] = value
+
+        if props.get("tiles") is None and props.get("url") is None:
+            raise ValueError("map_terrain: provide preset, tiles or url")
+
+        return super().create(*children, **props)
+
+
+# ---------------------------------------------------------------------------
 # Reflex extra: imperative camera
 # ---------------------------------------------------------------------------
 
@@ -590,6 +1051,12 @@ map_arc = MapArc.create
 map_geojson = MapGeoJSON.create
 map_cluster_layer = MapClusterLayer.create
 map_camera = MapCamera.create
+map_raster_layer = MapRasterLayer.create
+map_layer = MapLayer.create
+map_heatmap_layer = MapHeatmapLayer.create
+map_circle_layer = MapCircleLayer.create
+map_symbol_layer = MapSymbolLayer.create
+map_terrain = MapTerrain.create
 
 
 class MapcnNamespace(rx.ComponentNamespace):
@@ -611,6 +1078,13 @@ class MapcnNamespace(rx.ComponentNamespace):
     geojson = staticmethod(MapGeoJSON.create)
     cluster_layer = staticmethod(MapClusterLayer.create)
     camera = staticmethod(MapCamera.create)
+    # 0.2.0 layers (Reflex extras).
+    raster_layer = staticmethod(MapRasterLayer.create)
+    layer = staticmethod(MapLayer.create)
+    heatmap_layer = staticmethod(MapHeatmapLayer.create)
+    circle_layer = staticmethod(MapCircleLayer.create)
+    symbol_layer = staticmethod(MapSymbolLayer.create)
+    terrain = staticmethod(MapTerrain.create)
 
 
 mapcn = MapcnNamespace()
@@ -625,13 +1099,21 @@ __all__ = [
     "MapArcEvent",
     "MapCamera",
     "MapClickEvent",
+    "MapCircleLayer",
     "MapClusterLayer",
     "MapControls",
     "MapGeoJSON",
+    "LayerFeatureEvent",
     "MapGeoJSONEvent",
+    "RasterLoadError",
     "MapMarker",
     "MapPopup",
+    "MapHeatmapLayer",
+    "MapLayer",
+    "MapRasterLayer",
     "MapRoute",
+    "MapSymbolLayer",
+    "MapTerrain",
     "MapViewport",
     "MapcnComponent",
     "MapcnNamespace",
@@ -645,12 +1127,18 @@ __all__ = [
     "map",
     "map_arc",
     "map_camera",
+    "map_circle_layer",
     "map_cluster_layer",
     "map_controls",
     "map_geojson",
     "map_marker",
     "map_popup",
+    "map_heatmap_layer",
+    "map_layer",
+    "map_raster_layer",
     "map_route",
+    "map_symbol_layer",
+    "map_terrain",
     "mapcn",
     "marker_content",
     "marker_label",

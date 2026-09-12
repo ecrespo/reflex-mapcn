@@ -6,6 +6,10 @@ React module itself is exercised by the demo app in a browser.
 
 from __future__ import annotations
 
+import json
+import pathlib
+
+import pytest
 import reflex as rx
 import reflex_mapcn as mapcn
 
@@ -147,3 +151,391 @@ def test_camera_command_helper():
         "padding": 10,
         "seq": 3,
     }
+
+
+# ---------------------------------------------------------------------------
+# 0.2.0 layers
+# ---------------------------------------------------------------------------
+
+
+def _prop(component: rx.Component, name: str) -> str:
+    return str(getattr(component, name))
+
+
+def test_REQ_RAS_001_raster_layer_renders_inside_a_map():
+    rendered = _render(
+        mapcn.map(
+            mapcn.map_raster_layer(
+                id="radar",
+                tiles=["https://tiles.example.test/{z}/{x}/{y}.png"],
+                opacity=0.6,
+                before_id="waterway-name",
+            )
+        )
+    )
+    assert "MapcnRasterLayer" in rendered
+    assert "tiles" in rendered
+    assert "beforeId" in rendered
+
+
+def test_REQ_RAS_004_tile_size_scheme_and_attribution_reach_the_component():
+    layer = mapcn.map_raster_layer(
+        tiles=["https://tiles.example.test/{z}/{x}/{y}.png"],
+        tile_size=512,
+        scheme="tms",
+        attribution="© Example",
+    )
+    assert _prop(layer, "tile_size") == "512"
+    assert "tms" in _prop(layer, "scheme")
+    assert "Example" in _prop(layer, "attribution")
+
+
+def test_REQ_RAS_005_preset_fills_tiles_zoom_and_attribution():
+    layer = mapcn.map_raster_layer(preset="openseamap")
+    # Against the preset itself rather than a host spelled out here: the
+    # preset is the source of truth for what the layer should request.
+    assert mapcn.RASTER_PRESETS["openseamap"].tiles[0] in _prop(layer, "tiles")
+    assert _prop(layer, "tile_size") == "256"
+    assert _prop(layer, "max_zoom") == "18"
+    assert "OpenSeaMap" in _prop(layer, "attribution")
+
+
+def test_REQ_RAS_005_an_explicit_prop_overrides_the_preset():
+    layer = mapcn.map_raster_layer(preset="openseamap", max_zoom=10, opacity=0.5)
+    assert _prop(layer, "max_zoom") == "10"
+    assert _prop(layer, "opacity") == "0.5"
+
+
+def test_REQ_RAS_005_the_preset_name_is_not_forwarded_to_javascript():
+    # Presets live in Python only: the JSX always receives resolved tiles.
+    rendered = _render(mapcn.map_raster_layer(preset="openseamap"))
+    assert "preset" not in rendered
+
+
+def test_REQ_RAS_005_an_unknown_preset_is_rejected_at_creation():
+    with pytest.raises(ValueError, match="unknown preset"):
+        mapcn.map_raster_layer(preset="not_a_preset")
+
+
+def test_REQ_RAS_001_a_layer_without_tiles_preset_or_url_is_rejected():
+    with pytest.raises(ValueError, match="provide preset, tiles or url"):
+        mapcn.map_raster_layer(opacity=0.5)
+
+
+def test_REQ_RAS_006_the_rainviewer_preset_demands_tiles_from_the_helper():
+    with pytest.raises(ValueError, match="rainviewer_tiles"):
+        mapcn.map_raster_layer(preset="rainviewer")
+
+    layer = mapcn.map_raster_layer(
+        preset="rainviewer",
+        tiles=["https://tilecache.rainviewer.com/v2/{z}/{x}/{y}.png"],
+    )
+    assert _prop(layer, "max_zoom") == "7"
+
+
+def test_REQ_RAS_011_on_load_error_is_wired_as_an_event_handler():
+    rendered = _render(
+        mapcn.map(
+            mapcn.map_raster_layer(preset="openseamap", on_load_error=_State.on_geo)
+        )
+    )
+    assert "onLoadError" in rendered
+
+
+def test_REQ_LAY_001_generic_layer_renders_with_source_and_layer():
+    rendered = _render(
+        mapcn.map(
+            mapcn.map_layer(
+                id="faults",
+                source={"type": "geojson", "data": "/faults.geojson"},
+                layer={"type": "line", "paint": {"line-color": "#ef4444"}},
+                interactive=True,
+                on_hover=_State.on_geo,
+            )
+        )
+    )
+    assert "MapcnLayer" in rendered
+    assert "onHover" in rendered
+    assert "interactive" in rendered
+
+
+def test_REQ_LAY_002_source_can_be_the_id_of_a_style_source():
+    layer = mapcn.map_layer(
+        source="openmaptiles",
+        layer={"type": "fill-extrusion", "source-layer": "building", "minzoom": 14},
+    )
+    assert "openmaptiles" in _prop(layer, "source")
+
+
+def test_REQ_LAY_007_a_layer_without_a_type_is_rejected_at_creation():
+    with pytest.raises(ValueError, match="layer.type is required"):
+        mapcn.map_layer(
+            source={"type": "geojson", "data": "/x.geojson"},
+            layer={"paint": {"line-color": "#000"}},
+        )
+
+
+def test_REQ_LAY_007_a_source_that_is_neither_dict_nor_id_is_rejected():
+    with pytest.raises(ValueError, match="source must be a dict or a source id"):
+        mapcn.map_layer(source=42, layer={"type": "line"})
+
+
+def test_REQ_LAY_007_source_and_layer_are_both_required():
+    with pytest.raises(ValueError, match="source is required"):
+        mapcn.map_layer(layer={"type": "line"})
+    with pytest.raises(ValueError, match="layer is required"):
+        mapcn.map_layer(source={"type": "geojson", "data": "/x.geojson"})
+
+
+def test_REQ_LAY_007_a_state_var_source_is_not_validated_eagerly():
+    # A Var resolves in the browser; validating it here would reject valid code.
+    component = mapcn.map_layer(source=_State.viewport, layer={"type": "line"})
+    assert isinstance(component, mapcn.MapLayer)
+
+
+def test_REQ_HEA_003_weight_property_becomes_an_interpolated_weight():
+    layer = mapcn.map_heatmap_layer(
+        data={"type": "FeatureCollection", "features": []},
+        weight_property="mag",
+        weight_range=[4.0, 8.0],
+    )
+    assert json.loads(str(layer.weight)) == [
+        "interpolate",
+        ["linear"],
+        ["get", "mag"],
+        4.0,
+        0,
+        8.0,
+        1,
+    ]
+
+
+def test_REQ_HEA_003_an_explicit_weight_wins_over_the_property():
+    layer = mapcn.map_heatmap_layer(
+        data="/quakes.geojson",
+        weight=0.5,
+        weight_property="mag",
+        weight_range=[4.0, 8.0],
+    )
+    assert _prop(layer, "weight") == "0.5"
+
+
+def test_REQ_HEA_003_a_weight_property_without_a_range_is_rejected():
+    with pytest.raises(ValueError, match="weight_range"):
+        mapcn.map_heatmap_layer(data="/quakes.geojson", weight_property="mag")
+
+
+def test_REQ_HEA_004_max_zoom_fade_becomes_a_fading_opacity():
+    layer = mapcn.map_heatmap_layer(data="/quakes.geojson", max_zoom_fade=8)
+    assert json.loads(str(layer.opacity)) == [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        7,
+        1,
+        8,
+        0,
+    ]
+
+
+def test_REQ_HEA_004_an_explicit_opacity_wins_over_the_fade():
+    layer = mapcn.map_heatmap_layer(
+        data="/quakes.geojson", opacity=0.4, max_zoom_fade=8
+    )
+    assert _prop(layer, "opacity") == "0.4"
+
+
+def test_REQ_HEA_001_a_heatmap_without_data_is_rejected():
+    with pytest.raises(ValueError, match="data is required"):
+        mapcn.map_heatmap_layer(radius=20)
+
+
+def test_REQ_HEA_002_the_python_only_props_are_not_forwarded():
+    rendered = _render(
+        mapcn.map_heatmap_layer(
+            data="/quakes.geojson",
+            weight_property="mag",
+            weight_range=[4.0, 8.0],
+            max_zoom_fade=8,
+        )
+    )
+    assert "MapcnHeatmapLayer" in rendered
+    assert "weightProperty" not in rendered
+    assert "maxZoomFade" not in rendered
+
+
+def test_REQ_PNT_001_circle_layer_renders_with_data_driven_paint():
+    rendered = _render(
+        mapcn.map(
+            mapcn.map_circle_layer(
+                id="quakes",
+                data={"type": "FeatureCollection", "features": []},
+                promote_id="id",
+                radius=["interpolate", ["linear"], ["get", "mag"], 4, 4, 7, 24],
+                color=["step", ["get", "depth"], "#ef4444", 70, "#f97316"],
+                hover_paint={"circle-stroke-width": 3},
+                filter=["<=", ["get", "time"], 1690000000000],
+                on_click=_State.on_geo,
+            )
+        )
+    )
+    assert "MapcnCircleLayer" in rendered
+    assert "promoteId" in rendered
+    assert "hoverPaint" in rendered
+    assert "onClick" in rendered
+
+
+def test_REQ_PNT_001_a_circle_layer_without_data_is_rejected():
+    with pytest.raises(ValueError, match="data is required"):
+        mapcn.map_circle_layer(radius=5)
+
+
+def test_REQ_PNT_008_cluster_options_reach_the_component():
+    layer = mapcn.map_circle_layer(
+        data="/quakes.geojson", cluster=True, cluster_radius=80, cluster_max_zoom=12
+    )
+    assert _prop(layer, "cluster") == "true"
+    assert _prop(layer, "cluster_radius") == "80"
+    assert _prop(layer, "cluster_max_zoom") == "12"
+
+
+def test_REQ_PNT_002_symbol_layer_renders_icons_and_text():
+    rendered = _render(
+        mapcn.map(
+            mapcn.map_symbol_layer(
+                id="cities",
+                data={"type": "FeatureCollection", "features": []},
+                images={"pin": "/pin.png"},
+                icon_image="pin",
+                icon_size=1.2,
+                icon_allow_overlap=True,
+                text_field=["get", "name"],
+                text_size=12,
+                text_color="#111827",
+                on_click=_State.on_geo,
+            ),
+            glyphs_url="https://tiles.openfreemap.org/fonts",
+        )
+    )
+    assert "MapcnSymbolLayer" in rendered
+    assert "iconImage" in rendered
+    assert "textField" in rendered
+    assert "glyphsUrl" in rendered
+
+
+def test_REQ_PNT_002_a_symbol_layer_without_data_is_rejected():
+    with pytest.raises(ValueError, match="data is required"):
+        mapcn.map_symbol_layer(icon_image="pin")
+
+
+def test_REQ_TER_002_the_aws_preset_fills_tiles_and_encoding():
+    terrain = mapcn.map_terrain(preset="aws_terrarium")
+    assert "elevation-tiles-prod" in _prop(terrain, "tiles")
+    assert "terrarium" in _prop(terrain, "encoding")
+    assert _prop(terrain, "tile_size") == "256"
+    assert _prop(terrain, "max_zoom") == "15"
+    assert "Mapzen" in _prop(terrain, "attribution")
+
+
+def test_REQ_TER_002_an_explicit_prop_overrides_the_terrain_preset():
+    terrain = mapcn.map_terrain(preset="aws_terrarium", max_zoom=12, exaggeration=1.5)
+    assert _prop(terrain, "max_zoom") == "12"
+    assert _prop(terrain, "exaggeration") == "1.5"
+
+
+def test_REQ_TER_001_terrain_without_preset_tiles_or_url_is_rejected():
+    with pytest.raises(ValueError, match="provide preset, tiles or url"):
+        mapcn.map_terrain(exaggeration=1.2)
+
+
+def test_REQ_TER_002_an_unknown_terrain_preset_is_rejected():
+    with pytest.raises(ValueError, match="unknown preset"):
+        mapcn.map_terrain(preset="everest")
+
+
+def test_REQ_TER_003_terrain_renders_with_hillshade():
+    rendered = _render(
+        mapcn.map(
+            mapcn.map_terrain(
+                preset="aws_terrarium",
+                exaggeration=1.3,
+                hillshade=True,
+                hillshade_paint={"hillshade-shadow-color": "#334155"},
+            )
+        )
+    )
+    assert "MapcnMapTerrain" in rendered
+    assert "hillshadePaint" in rendered
+    assert "exaggeration" in rendered
+
+
+# ---------------------------------------------------------------------------
+# Public surface (T-013)
+# ---------------------------------------------------------------------------
+
+
+def test_every_0_2_0_factory_is_exported_and_aliased():
+    for name in (
+        "map_raster_layer",
+        "map_layer",
+        "map_heatmap_layer",
+        "map_circle_layer",
+        "map_symbol_layer",
+        "map_terrain",
+    ):
+        assert name in mapcn.__all__, name
+        assert callable(getattr(mapcn, name)), name
+
+    for cls in (
+        mapcn.MapRasterLayer,
+        mapcn.MapLayer,
+        mapcn.MapHeatmapLayer,
+        mapcn.MapCircleLayer,
+        mapcn.MapSymbolLayer,
+        mapcn.MapTerrain,
+    ):
+        assert cls.alias.startswith("Mapcn"), cls
+
+
+def test_the_namespace_mirrors_the_new_factories():
+    ns = mapcn.mapcn
+    assert isinstance(ns.raster_layer(preset="openseamap"), mapcn.MapRasterLayer)
+    assert isinstance(
+        ns.layer(source="openmaptiles", layer={"type": "line"}), mapcn.MapLayer
+    )
+    assert isinstance(ns.heatmap_layer(data="/x.geojson"), mapcn.MapHeatmapLayer)
+    assert isinstance(ns.circle_layer(data="/x.geojson"), mapcn.MapCircleLayer)
+    assert isinstance(ns.symbol_layer(data="/x.geojson"), mapcn.MapSymbolLayer)
+    assert isinstance(ns.terrain(preset="aws_terrarium"), mapcn.MapTerrain)
+
+
+def test_presets_and_helpers_are_reachable_from_the_package():
+    assert mapcn.RASTER_PRESETS["openseamap"].max_zoom == 18
+    assert mapcn.TERRAIN_PRESETS["aws_terrarium"].encoding == "terrarium"
+    assert mapcn.interpolate("mag", [(4, 4), (7, 24)])[0] == "interpolate"
+    tiles = mapcn.rainviewer_tiles({"time": 1, "path": "/p"}, "https://host")
+    assert tiles[0].startswith("https://host/p/256/")
+
+
+def test_the_type_stubs_declare_the_new_components():
+    # Generated by `reflex component build`: a stale stub means no completion.
+    stub = (pathlib.Path(mapcn.__file__).parent / "mapcn.pyi").read_text()
+    for name in (
+        "MapRasterLayer",
+        "MapLayer",
+        "MapHeatmapLayer",
+        "MapCircleLayer",
+        "MapSymbolLayer",
+        "MapTerrain",
+    ):
+        assert f"class {name}(" in stub, name
+    assert "glyphs_url" in stub
+
+
+def test_REQ_HEA_007_filter_prop_reaches_the_layer():
+    # Delta 2026-09-heatmap-filter: density has to follow the same sliders as
+    # the points, and filtering in the browser is the only way that is cheap.
+    layer = mapcn.map_heatmap_layer(
+        data="/quakes.geojson", filter=["<=", ["get", "time"], 1690000000000]
+    )
+    assert json.loads(str(layer.filter)) == ["<=", ["get", "time"], 1690000000000]

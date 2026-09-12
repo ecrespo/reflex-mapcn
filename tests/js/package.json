@@ -1,0 +1,11 @@
+{
+  "name": "reflex-mapcn-jsx-tests",
+  "private": true,
+  "type": "module",
+  "description": "Browser tests for custom_components/reflex_mapcn/mapcn.jsx. Development only: the published package still depends on maplibre-gl alone.",
+  "devDependencies": {
+    "playwright": "^1.49.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

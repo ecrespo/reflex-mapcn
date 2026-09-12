@@ -1,0 +1,15 @@
+{
+  "code": "Ok",
+  "routes": [
+    {
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[-66.9036, 10.4806], [-67.4, 10.3], [-68.0077, 10.162]]
+      },
+      "duration": 7200.5,
+      "distance": 154000.0,
+      "legs": []
+    }
+  ],
+  "waypoints": []
+}

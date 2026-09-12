@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo / Claude |
-| **Estado** | `DRAFT` — checkpoint 2 (revisar tras aprobar el PRD) |
+| **Estado** | `APPROVED` — aprobado 2026-09-11 (checkpoint 2) · `IMPLEMENTED 0.2.0` — 2026-09-12 |
 | **Versión API** | 0.2.0 (SemVer del paquete) |
 | **Fecha** | 2026-09-11 |
 | **PRD relacionado** | `docs/specs/prd/mapcn-layers-0.2.md` |
@@ -143,6 +143,8 @@ mapcn.map_layer(
 | `color` | `list` | rampa azul→amarillo→rojo (ver Data Model §5) | `heatmap-color` |
 | `opacity` | `float \| list` | 0.8 | `heatmap-opacity` |
 | `max_zoom_fade` | `float` | — | genera `heatmap-opacity` que desvanece entre `Z-1` y `Z` (REQ-HEA-004) |
+| `filter` | `list` | — | `filter` (caliente, REQ-HEA-007) |
+| `min_zoom` / `max_zoom` | `float` | — | `minzoom`/`maxzoom` (calientes) |
 | `before_id`, `visible` | | | |
 
 **Eventos:** ninguno (heatmap no es interactivo en MapLibre).
@@ -260,14 +262,16 @@ No forman parte del paquete publicado. Contratos:
 ```python
 VENEZUELA_BBOX = (-74.0, 0.5, -59.0, 13.0)   # (minlon, minlat, maxlon, maxlat)
 
-async def fetch_catalog(*, min_magnitude: float = 4.0, start: str = "1900-01-01", end: str | None = None,
+async def fetch_catalog(*, min_magnitude: float = 4.5, start: str = "1900-01-01", end: str | None = None,
                         bbox: tuple = VENEZUELA_BBOX, timeout: float = 15.0) -> SeismicCatalog
 async def fetch_live(*, days: int = 30, min_magnitude: float = 2.5,
                      bbox: tuple = VENEZUELA_BBOX, timeout: float = 15.0) -> SeismicCatalog   # FDSN query con starttime = now - days
 ```
 `SeismicCatalog = {"features": FeatureCollection recortada (Data Model §3), "count": int, "fetched_at": ISO-8601 UTC, "source": "usgs", "error": str | None}`. Caché: `functools`-like TTL en módulo (10 min catálogo, 60 s live) con clave = parámetros. Errores ⇒ `error` relleno, `features` = último valor cacheado o colección vacía (REQ-SIS-003).
 
-URL construida: `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minlatitude=0.5&maxlatitude=13&minlongitude=-74&maxlongitude=-59&starttime=1900-01-01&minmagnitude=4.0&orderby=time&limit=20000`.
+URL construida: `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minlatitude=0.5&maxlatitude=13&minlongitude=-74&maxlongitude=-59&starttime=1900-01-01&minmagnitude=4.5&orderby=time&limit=20000`.
+
+El defecto es 4,5 y no 4,0 porque el catálogo del USGS solo es completo para Venezuela desde ~1973 a partir de esa magnitud, y porque con 4,0 el histórico no cabía en el presupuesto de 400 KB (Delta `2026-09-catalog-payload`). El parámetro sigue abierto: una app puede pedir 4,0. El histórico no incluye `url` ni `recent`, y ninguna feature recortada lleva `id` de nivel de feature.
 
 ### 5.2 `osrm.py`
 ```python
@@ -304,3 +308,4 @@ SemVer. 0.2.0 es aditivo. Deprecaciones futuras: aviso en `create()` (`Deprecati
 |---|---|---|
 | 0.2.0-draft | 2026-09-11 | Versión inicial |
 | 0.2.0-draft.2 | 2026-09-11 | Analyze: advertencias LAY-010/PNT-010, defaults de `interactive` explicados |
+| 0.2.0-draft.3 | 2026-09-11 | Delta `2026-09-heatmap-filter`: `filter`, `min_zoom` y `max_zoom` en `map_heatmap_layer` |

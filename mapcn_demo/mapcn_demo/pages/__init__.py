@@ -9,6 +9,8 @@ from . import (  # noqa: F401
     geojson,
     markers,
     popups,
+    raster,
     routes,
+    sismos,
     venezuela,
 )

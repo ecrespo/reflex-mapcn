@@ -9,8 +9,66 @@ from __future__ import annotations
 
 import dataclasses
 
+from reflex_mapcn import interpolate, step
+
 # Served by Reflex from the demo's assets/ folder.
 VENEZUELA_STATES_URL = "/venezuela_estados.geojson"
+
+# Active faults from the GEM Global Active Faults database, clipped to the
+# country and simplified by `scripts/build_faults.py`. Rerun that script to
+# refresh the file; the licence requires the attribution below wherever the
+# faults are drawn.
+VENEZUELA_FAULTS_URL = "/venezuela_fallas.geojson"
+FAULTS_ATTRIBUTION = "GEM Global Active Faults (CC BY-SA 4.0)"
+
+# Colour per slip type. Anything not listed, `null` included, draws slate.
+SLIP_TYPE_COLORS = {
+    "Dextral": "#ef4444",
+    "Sinistral": "#f97316",
+    "Reverse": "#a855f7",
+    "Thrust": "#a855f7",
+    "Subduction_Thrust": "#a855f7",
+    "Normal": "#3b82f6",
+}
+SLIP_TYPE_DEFAULT_COLOR = "#64748b"
+
+# Seismic styling, shared by the map layers and the legend of /sismos.
+# Radius grows with magnitude and colour steps through the three depth bands
+# seismology uses: shallow, intermediate and deep.
+MAG_RADIUS = interpolate("mag", [(4, 4), (5, 8), (6, 14), (7, 24), (8, 34)])
+DEPTH_COLOR = step("depth", "#ef4444", [(70, "#f97316"), (300, "#3b82f6")])
+DEPTH_BANDS = {"shallow": (0, 70), "intermediate": (70, 300), "deep": (300, 1000)}
+
+
+@dataclasses.dataclass(frozen=True)
+class NotableQuake:
+    """A historical earthquake worth marking on the map."""
+
+    date: str
+    name: str
+    magnitude: float
+    longitude: float
+    latitude: float
+    source: str
+
+
+# The USGS catalogue is only complete for Venezuela from about 1973 onwards,
+# so the earthquakes everyone remembers are listed by hand.
+NOTABLE_QUAKES: list[NotableQuake] = [
+    NotableQuake(
+        "1812-03-26",
+        "Terremoto de Caracas 1812",
+        7.7,
+        -66.9,
+        10.5,
+        "FUNVISIS/USGS hist.",
+    ),
+    NotableQuake("1967-07-29", "Terremoto de Caracas 1967", 6.6, -67.1, 10.6, "USGS"),
+    NotableQuake("1997-07-09", "Terremoto de Cariaco", 6.9, -63.5, 10.6, "USGS"),
+    NotableQuake(
+        "2018-08-21", "Sismo de Boca de Uchire / Yaguaraparo", 7.3, -62.9, 10.8, "USGS"
+    ),
+]
 
 # Rough country box used for the initial fit and to keep the camera nearby.
 VENEZUELA_BOUNDS = [[-73.6, 0.5], [-59.5, 12.5]]
@@ -138,6 +196,40 @@ CITIES: list[City] = [
     City("Cabimas", "Zulia", "ciudad", -71.4383, 10.3986),
     City("El Tigre", "Anzoátegui", "ciudad", -64.2589, 8.8919),
     City("Carúpano", "Sucre", "ciudad", -63.2583, 10.6667),
+]
+
+
+@dataclasses.dataclass(frozen=True)
+class Capital:
+    """The seat of a state, as a place a car can be routed to."""
+
+    state: str
+    name: str
+    lng: float
+    lat: float
+
+
+# No road reaches these, so they are never a driving destination. Their own
+# capitals may still be an origin: the answer is then a column of holes.
+INSULAR_STATES = frozenset({"Dependencias Federales", "Isla de Aves", "Nueva Esparta"})
+
+
+def _build_capitals() -> dict[str, Capital]:
+    """Pair every state with the marker that already carries its capital."""
+    cities = {(city.name, city.state): city for city in CITIES}
+    capitals: dict[str, Capital] = {}
+    for state in STATE_NAMES:
+        name = STATE_INFO[state]["capital"]
+        city = cities.get((name, state))
+        if city is not None:
+            capitals[state] = Capital(state, name, city.lng, city.lat)
+    return capitals
+
+
+CAPITALS: dict[str, Capital] = _build_capitals()
+
+CONTINENTAL_CAPITALS: list[Capital] = [
+    capital for state, capital in CAPITALS.items() if state not in INSULAR_STATES
 ]
 
 # Basemap styles with street-level detail (OpenStreetMap data via OpenFreeMap).
