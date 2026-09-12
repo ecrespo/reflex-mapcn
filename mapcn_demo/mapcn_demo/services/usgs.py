@@ -66,6 +66,11 @@ def _trim(
 
     Returns None for an event without a magnitude: the radius and the colour
     of every layer are driven by it, so it has nothing to draw.
+
+    Three fields the raw response carries are left behind: the event page url,
+    which is the id in a template; the feature-level id, which repeats
+    ``properties.id``, the one ``promote_id`` promotes; and ``recent`` outside
+    the live feed. Together they were a third of what crossed the wire.
     """
     properties = feature.get("properties") or {}
     magnitude = properties.get("mag")
@@ -87,15 +92,16 @@ def _trim(
         "depth": round(float(depth), 1) if depth is not None else 0.0,
         "time": time_ms,
         "place": properties.get("place"),
-        "url": properties.get("url"),
-        "recent": bool(mark_recent and now_ms - time_ms < RECENT_MS),
     }
     if depth is None:
         trimmed["depth_unknown"] = True
+    # Only the live feed rings the last day; in the history the flag would be
+    # false 3500 times over (Delta 2026-09-catalog-payload).
+    if mark_recent:
+        trimmed["recent"] = now_ms - time_ms < RECENT_MS
 
     return {
         "type": "Feature",
-        "id": feature.get("id"),
         "properties": trimmed,
         "geometry": {
             "type": "Point",
@@ -157,7 +163,7 @@ async def _query(
 
 async def fetch_catalog(
     *,
-    min_magnitude: float = 4.0,
+    min_magnitude: float = 4.5,
     start: str = "1900-01-01",
     end: str | None = None,
     bbox: tuple[float, float, float, float] = VENEZUELA_BBOX,
@@ -168,7 +174,10 @@ async def fetch_catalog(
 
     The whole catalogue travels to the browser once; the time, magnitude and
     depth filters then run there, which is why this is cached for ten minutes
-    rather than queried per interaction.
+    rather than queried per interaction. It also has to fit in 400 KB, and
+    the websocket of Reflex negotiates no compression, so the default asks for
+    the magnitude from which this catalogue is complete rather than for
+    everything it holds.
     """
     min_lon, min_lat, max_lon, max_lat = bbox
     params: dict[str, Any] = {

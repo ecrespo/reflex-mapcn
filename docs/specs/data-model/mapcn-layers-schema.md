@@ -110,23 +110,26 @@ Se representan como `list` JSON; el wrapper no las valida (MapLibre lo hace). He
 ### 3.2 Salida: `SeismicFeature` (recortado, lo que viaja al cliente)
 
 ```jsonc
-{ "type": "Feature", "id": "us7000abcd",
+{ "type": "Feature",
   "properties": { "id": "us7000abcd", "mag": 5.1, "magType": "mww", "depth": 12.4, "time": 1690000000000,
-                  "place": "35 km NNE of Cumaná, Venezuela", "url": "https://...", "recent": false },
+                  "place": "35 km NNE of Cumaná, Venezuela" },
   "geometry": { "type": "Point", "coordinates": [-64.1, 10.7] } }
 ```
 
 | Campo | Tipo | Requerido | Origen | Notas |
 |---|---|---|---|---|
-| `id` | str | Sí | `Feature.id` | también en properties para `promote_id="id"` |
+| `id` | str | Sí | `Feature.id` del USGS | solo en properties: es lo que promociona `promote_id="id"`, y duplicarlo en la feature costaba 59 KB |
 | `mag` | float | Sí | `properties.mag` | eventos con `mag` null se descartan |
 | `magType` | str | No | `properties.magType` | |
 | `depth` | float (km) | Sí | `geometry.coordinates[2]` | null → 0.0 y se marca `depth_unknown: true` |
 | `time` | int (ms UTC) | Sí | `properties.time` | filtro temporal; NO ISO para que `["<=", ["get","time"], t]` funcione |
 | `place` | str | No | `properties.place` | |
-| `url` | str | No | `properties.url` | |
-| `recent` | bool | Sí | calculado | `now - time < 24 h` (solo en feed live) |
+| `recent` | bool | Sí en el feed live | calculado | `now - time < 24 h`; ausente en el histórico, donde siempre sería `false` |
 | `geometry.coordinates` | [lng, lat] | Sí | redondeo 4 decimales | |
+
+La ficha del USGS no viaja: se reconstruye desde el id con
+`https://earthquake.usgs.gov/earthquakes/eventpage/{id}`. Eran 236 KB de los
+1 089 KB medidos antes del Delta `2026-09-catalog-payload`.
 
 ### 3.3 `SeismicCatalog` (TypedDict Python)
 
@@ -235,7 +238,7 @@ class TTLCache:            # dict[str, tuple[expires_at: float, value: Any]]; si
 
 | Clave | TTL | Tamaño aprox. |
 |---|---|---|
-| `usgs:catalog:{min_mag}:{start}:{end}:{bbox}` | 600 s | ≤ 400 KB |
+| `usgs:catalog:{min_mag}:{start}:{end}:{bbox}` | 600 s | ≤ 400 KB (340 KB medidos con el defecto M ≥ 4,5) |
 | `usgs:live:{days}:{min_mag}:{bbox}` | 60 s | ≤ 50 KB |
 | `osrm:table:{profile}:{lng},{lat}` | 3600 s | ≤ 2 KB |
 | `rainviewer:frames` | 300 s | ≤ 5 KB |

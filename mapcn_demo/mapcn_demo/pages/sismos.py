@@ -123,6 +123,18 @@ def build_layer_filter(cutoff_ms: int, min_magnitude: float, depth_band: str) ->
     return clauses
 
 
+EVENT_PAGE = "https://earthquake.usgs.gov/earthquakes/eventpage/{id}"
+
+
+def event_url(event_id: str) -> str:
+    """The USGS page of one event, rebuilt from its id.
+
+    The url used to travel with every event and was 236 KB of the payload
+    (Delta 2026-09-catalog-payload); it is a template with the id in it.
+    """
+    return EVENT_PAGE.format(id=event_id) if event_id else ""
+
+
 def format_event_times(time_ms: int) -> dict[str, str]:
     """The same instant in UTC and in Venezuelan time."""
     if not time_ms:
@@ -197,6 +209,10 @@ class SismosState(rx.State):
         magnitude = self.selected.get("mag")
         kind = self.selected.get("magType") or ""
         return f"M {magnitude} {kind}".strip() if magnitude else "Sismo"
+
+    @rx.var
+    def selected_url(self) -> str:
+        return event_url(str(self.selected.get("id", "")))
 
     @rx.var
     def selected_depth(self) -> str:
@@ -634,7 +650,7 @@ def _map() -> rx.Component:
                     rx.text(SismosState.selected_caracas, size="1"),
                     rx.link(
                         "Ficha del USGS",
-                        href=SismosState.selected["url"],
+                        href=SismosState.selected_url,
                         is_external=True,
                         size="1",
                     ),

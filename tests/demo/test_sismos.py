@@ -167,3 +167,19 @@ def test_REQ_SIS_007_the_page_carries_every_optional_layer():
     assert "MapcnHeatmapLayer" in rendered
     assert "MapcnLayer" in rendered, "the fault layer"
     assert "MapcnMapTerrain" in rendered
+
+
+# ---------------------------------------------------------------------------
+# Delta 2026-09-catalog-payload
+# ---------------------------------------------------------------------------
+
+
+def test_REQ_SIS_006_the_event_page_is_rebuilt_from_the_id():
+    # The url used to travel with every event and was 236 KB of the payload.
+    assert sismos.event_url("us7000abcd") == (
+        "https://earthquake.usgs.gov/earthquakes/eventpage/us7000abcd"
+    )
+
+
+def test_REQ_SIS_006_an_event_without_an_id_has_no_link():
+    assert sismos.event_url("") == ""

@@ -23,7 +23,7 @@
 ## 2. Objetivos técnicos
 
 - **Correctitud:** ninguna fuente/capa huérfana tras cambio de tema, navegación entre páginas o cambio de props frías (verificado por test JSX con MapLibre simulado que inspecciona `getLayersOrder()` y `_sources`).
-- **Rendimiento:** actualización de `filter`/paint sin recrear capas; 10 000 puntos en `circle` a ≥ 30 fps; payload histórico ≤ 400 KB.
+- **Rendimiento:** actualización de `filter`/paint sin recrear capas; 10 000 puntos en `circle` a ≥ 30 fps; payload histórico ≤ 400 KB. El websocket de Reflex no negocia compresión (medido en T-020), así que el presupuesto se mide sobre el dato en claro.
 - **Mantenibilidad:** un hook para el ciclo de vida; presets en Python; cada componente < 150 líneas de JSX.
 - **Operabilidad:** advertencias con prefijo `mapcn:`; helpers de backend con timeouts y caché; sin claves.
 

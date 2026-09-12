@@ -262,14 +262,16 @@ No forman parte del paquete publicado. Contratos:
 ```python
 VENEZUELA_BBOX = (-74.0, 0.5, -59.0, 13.0)   # (minlon, minlat, maxlon, maxlat)
 
-async def fetch_catalog(*, min_magnitude: float = 4.0, start: str = "1900-01-01", end: str | None = None,
+async def fetch_catalog(*, min_magnitude: float = 4.5, start: str = "1900-01-01", end: str | None = None,
                         bbox: tuple = VENEZUELA_BBOX, timeout: float = 15.0) -> SeismicCatalog
 async def fetch_live(*, days: int = 30, min_magnitude: float = 2.5,
                      bbox: tuple = VENEZUELA_BBOX, timeout: float = 15.0) -> SeismicCatalog   # FDSN query con starttime = now - days
 ```
 `SeismicCatalog = {"features": FeatureCollection recortada (Data Model §3), "count": int, "fetched_at": ISO-8601 UTC, "source": "usgs", "error": str | None}`. Caché: `functools`-like TTL en módulo (10 min catálogo, 60 s live) con clave = parámetros. Errores ⇒ `error` relleno, `features` = último valor cacheado o colección vacía (REQ-SIS-003).
 
-URL construida: `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minlatitude=0.5&maxlatitude=13&minlongitude=-74&maxlongitude=-59&starttime=1900-01-01&minmagnitude=4.0&orderby=time&limit=20000`.
+URL construida: `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minlatitude=0.5&maxlatitude=13&minlongitude=-74&maxlongitude=-59&starttime=1900-01-01&minmagnitude=4.5&orderby=time&limit=20000`.
+
+El defecto es 4,5 y no 4,0 porque el catálogo del USGS solo es completo para Venezuela desde ~1973 a partir de esa magnitud, y porque con 4,0 el histórico no cabía en el presupuesto de 400 KB (Delta `2026-09-catalog-payload`). El parámetro sigue abierto: una app puede pedir 4,0. El histórico no incluye `url` ni `recent`, y ninguna feature recortada lleva `id` de nivel de feature.
 
 ### 5.2 `osrm.py`
 ```python
