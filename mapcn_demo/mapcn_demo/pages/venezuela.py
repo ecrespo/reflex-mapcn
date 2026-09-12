@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import reflex as rx
 import reflex_mapcn as mapcn
 
 from ..layout import code, demo_frame, page, section
+from ..services import osrm
 from ..venezuela_data import (
+    CAPITALS,
     CITIES,
+    CONTINENTAL_CAPITALS,
     REGION_COLORS,
     STATE_BOUNDS,
     STATE_INFO,
@@ -17,10 +22,20 @@ from ..venezuela_data import (
     VENEZUELA_MAX_BOUNDS,
     VENEZUELA_STATES_URL,
     VENEZUELA_STYLES,
+    Capital,
     City,
 )
 
 DEFAULT_STYLE = "OpenFreeMap Liberty (calles, POIs)"
+
+# Travel times: read from the public OSRM demo server, so the licence of the
+# underlying road network has to travel with them.
+TRAVEL_ATTRIBUTION = (
+    "Tiempos y rutas: OSRM (router.project-osrm.org) · red vial de OpenStreetMap (ODbL)"
+)
+MAX_DESTINATIONS = osrm.MAX_DESTINATIONS
+ROUTE_COLOR = "#2563eb"
+NO_ROUTE_LABEL = "sin ruta"
 
 REGION_COLOR_EXPRESSION = [
     "match",
@@ -37,6 +52,87 @@ KIND_LABELS = {
 }
 
 
+@dataclasses.dataclass
+class TravelRow:
+    """One line of the travel-time table."""
+
+    state: str
+    capital: str
+    lng: float
+    lat: float
+    duration_s: float | None
+    distance_m: float | None
+    duration_label: str
+    distance_label: str
+
+
+def capital_of(state: str) -> Capital | None:
+    """The capital to drive from or to, when the state has one."""
+    return CAPITALS.get(state)
+
+
+def destinations_for(state: str) -> list[Capital]:
+    """Every mainland capital other than the one being driven from."""
+    if capital_of(state) is None:
+        return []
+    return [capital for capital in CONTINENTAL_CAPITALS if capital.state != state]
+
+
+def format_duration(seconds: float | None) -> str:
+    """A drive as ``5h 30m``, or as the reason there is no drive."""
+    if seconds is None:
+        return NO_ROUTE_LABEL
+    minutes = int(round(seconds / 60))
+    if minutes < 60:
+        return f"{minutes} min"
+    return f"{minutes // 60}h {minutes % 60}m"
+
+
+def format_distance(metres: float | None) -> str:
+    if metres is None:
+        return "—"
+    return f"{metres / 1000:.0f} km"
+
+
+def build_travel_rows(
+    destinations: list[Capital],
+    durations: list[float | None],
+    distances: list[float | None],
+) -> list[TravelRow]:
+    """Pair each destination with its cell, nearest first, holes last."""
+    rows = [
+        TravelRow(
+            state=capital.state,
+            capital=capital.name,
+            lng=capital.lng,
+            lat=capital.lat,
+            duration_s=durations[index] if index < len(durations) else None,
+            distance_m=distances[index] if index < len(distances) else None,
+            duration_label=format_duration(
+                durations[index] if index < len(durations) else None
+            ),
+            distance_label=format_distance(
+                distances[index] if index < len(distances) else None
+            ),
+        )
+        for index, capital in enumerate(destinations)
+    ]
+    rows.sort(key=lambda row: (row.duration_s is None, row.duration_s or 0.0))
+    return rows
+
+
+def bounds_of(coordinates: list[list[float]]) -> list[list[float]] | None:
+    """The box the camera has to fit to show a whole route."""
+    if not coordinates:
+        return None
+    longitudes = [point[0] for point in coordinates]
+    latitudes = [point[1] for point in coordinates]
+    return [
+        [min(longitudes), min(latitudes)],
+        [max(longitudes), max(latitudes)],
+    ]
+
+
 class VenezuelaState(rx.State):
     """State for the Venezuela country demo."""
 
@@ -50,6 +146,18 @@ class VenezuelaState(rx.State):
 
     command: dict = {}
     _seq: int = 0
+
+    # ---- travel times ------------------------------------------------------
+
+    travel_origin: str = ""
+    travel_rows: list[TravelRow] = []
+    travel_error: str = ""
+    travel_loading: bool = False
+
+    selected_travel: str = ""
+    route_coordinates: list[list[float]] = []
+    route_error: str = ""
+    route_loading: bool = False
 
     # ---- camera -----------------------------------------------------------
 
@@ -120,6 +228,76 @@ class VenezuelaState(rx.State):
     def set_show_cities(self, value: bool):
         self.show_cities = value
 
+    # ---- travel times -------------------------------------------------------
+
+    @rx.event(background=True)
+    async def load_travel_times(self):
+        """Ask OSRM how long it takes to drive to every other capital."""
+        async with self:
+            origin_state = self.selected_state
+            origin = capital_of(origin_state)
+            if origin is None:
+                self.travel_error = "Ese estado no tiene capital por carretera."
+                return
+            self.travel_loading = True
+            self.travel_error = ""
+            self.travel_origin = origin_state
+            self.travel_rows = []
+            self.selected_travel = ""
+            self.route_coordinates = []
+            self.route_error = ""
+
+        destinations = destinations_for(origin_state)
+        matrix = await osrm.table(
+            (origin.lng, origin.lat),
+            [(capital.lng, capital.lat) for capital in destinations],
+        )
+
+        async with self:
+            self.travel_rows = build_travel_rows(
+                destinations, matrix["durations"], matrix["distances"]
+            )
+            self.travel_error = matrix["error"] or ""
+            self.travel_loading = False
+
+    @rx.event(background=True)
+    async def select_travel_row(self, state_name: str):
+        """Draw the road route to one capital and frame it."""
+        async with self:
+            origin = capital_of(self.travel_origin)
+            destination = capital_of(state_name)
+            if origin is None or destination is None:
+                return
+            self.selected_travel = state_name
+            self.route_loading = True
+            self.route_error = ""
+            self.route_coordinates = []
+
+        result = await osrm.route(
+            [(origin.lng, origin.lat), (destination.lng, destination.lat)]
+        )
+
+        async with self:
+            self.route_coordinates = result["coordinates"]
+            self.route_error = result["error"] or ""
+            self.route_loading = False
+            box = bounds_of(result["coordinates"])
+            if box is not None:
+                self._push(
+                    mapcn.camera_command(
+                        "fitBounds", bounds=box, padding=60, duration=1500
+                    )
+                )
+
+    @rx.event
+    def clear_travel(self):
+        self.travel_rows = []
+        self.travel_origin = ""
+        self.travel_error = ""
+        self.selected_travel = ""
+        self.route_coordinates = []
+        self.route_error = ""
+
     # ---- computed -----------------------------------------------------------
 
     @rx.var
@@ -156,6 +334,23 @@ class VenezuelaState(rx.State):
     @rx.var
     def selected_color(self) -> str:
         return REGION_COLORS.get(self.selected_region, "#9ca3af")
+
+    @rx.var
+    def can_route(self) -> bool:
+        return self.selected_state in CAPITALS
+
+    @rx.var
+    def has_travel_rows(self) -> bool:
+        return len(self.travel_rows) > 0
+
+    @rx.var
+    def has_route(self) -> bool:
+        return len(self.route_coordinates) > 1
+
+    @rx.var
+    def travel_origin_capital(self) -> str:
+        capital = CAPITALS.get(self.travel_origin)
+        return capital.name if capital is not None else ""
 
     @rx.var
     def zoom_label(self) -> str:
@@ -281,6 +476,110 @@ def legend() -> rx.Component:
     )
 
 
+def travel_row(row: TravelRow) -> rx.Component:
+    """One capital, how long the drive takes and how far it is."""
+    selected = VenezuelaState.selected_travel == row.state
+    return rx.hstack(
+        rx.text(row.capital, size="1", weight="medium"),
+        rx.spacer(),
+        rx.text(
+            row.duration_label,
+            size="1",
+            color=rx.cond(
+                row.duration_label == NO_ROUTE_LABEL,
+                rx.color("gray", 9),
+                rx.color("gray", 12),
+            ),
+            weight="medium",
+        ),
+        rx.text(
+            row.distance_label,
+            size="1",
+            color=rx.color("gray", 10),
+            width="58px",
+            text_align="right",
+        ),
+        width="100%",
+        align="center",
+        spacing="2",
+        padding="4px 8px",
+        border_radius="6px",
+        cursor="pointer",
+        background_color=rx.cond(selected, rx.color("blue", 3), "transparent"),
+        _hover={"background_color": rx.color("gray", 3)},
+        on_click=VenezuelaState.select_travel_row(row.state),
+    )
+
+
+def travel_panel() -> rx.Component:
+    """The travel-time table, shown once a matrix has been read."""
+    return rx.cond(
+        VenezuelaState.has_travel_rows | VenezuelaState.travel_loading,
+        rx.vstack(
+            rx.hstack(
+                rx.icon("car", size=14, color=ROUTE_COLOR),
+                rx.text(
+                    "Desde ",
+                    rx.text.strong(VenezuelaState.travel_origin_capital),
+                    size="1",
+                ),
+                rx.spacer(),
+                rx.icon_button(
+                    rx.icon("x", size=12),
+                    size="1",
+                    variant="ghost",
+                    color_scheme="gray",
+                    on_click=VenezuelaState.clear_travel,
+                ),
+                width="100%",
+                align="center",
+            ),
+            rx.cond(
+                VenezuelaState.travel_error != "",
+                rx.callout(
+                    "No se pudo leer la matriz de tiempos. Inténtalo de nuevo.",
+                    icon="triangle_alert",
+                    size="1",
+                    color_scheme="amber",
+                    width="100%",
+                ),
+            ),
+            rx.cond(
+                VenezuelaState.travel_loading,
+                rx.hstack(
+                    rx.spinner(size="1"),
+                    rx.text("Consultando OSRM…", size="1"),
+                    spacing="2",
+                    align="center",
+                ),
+                rx.vstack(
+                    rx.foreach(VenezuelaState.travel_rows, travel_row),
+                    spacing="0",
+                    width="100%",
+                    max_height="300px",
+                    overflow_y="auto",
+                ),
+            ),
+            rx.text(
+                "Pulsa una fila para dibujar la ruta.",
+                size="1",
+                color=rx.color("gray", 10),
+            ),
+            spacing="2",
+            align="start",
+            width="270px",
+            position="absolute",
+            right="12px",
+            bottom="12px",
+            padding="12px",
+            border_radius="10px",
+            background_color=rx.color("gray", 1),
+            border=f"1px solid {rx.color('gray', 5)}",
+            z_index="10",
+        ),
+    )
+
+
 def control_panel() -> rx.Component:
     return rx.vstack(
         rx.hstack(
@@ -362,6 +661,16 @@ def control_panel() -> rx.Component:
                 rx.text(
                     "Región: ", rx.text.strong(VenezuelaState.selected_region), size="1"
                 ),
+                rx.button(
+                    rx.icon("car", size=12),
+                    "Tiempos de viaje",
+                    size="1",
+                    variant="soft",
+                    width="100%",
+                    disabled=~VenezuelaState.can_route,
+                    loading=VenezuelaState.travel_loading,
+                    on_click=VenezuelaState.load_travel_times,
+                ),
                 spacing="1",
                 align="start",
                 width="100%",
@@ -432,6 +741,15 @@ def venezuela_page() -> rx.Component:
                         VenezuelaState.show_cities,
                         rx.fragment(*[city_marker(city) for city in CITIES]),
                     ),
+                    rx.cond(
+                        VenezuelaState.has_route,
+                        mapcn.map_route(
+                            coordinates=VenezuelaState.route_coordinates,
+                            color=ROUTE_COLOR,
+                            width=5,
+                            opacity=0.95,
+                        ),
+                    ),
                     mapcn.map_controls(
                         position="top-right",
                         show_zoom=True,
@@ -447,6 +765,7 @@ def venezuela_page() -> rx.Component:
                     on_move_end=VenezuelaState.on_move_end,
                 ),
                 control_panel(),
+                travel_panel(),
                 legend(),
                 height="680px",
             ),
@@ -491,6 +810,8 @@ mapcn.map(
             "polígonos de estados provienen del plugin country-map de Apache "
             "Superset (Apache-2.0) y se sirven como un archivo estático de "
             "~100 KB desde la carpeta assets/ del demo; las coordenadas de "
-            "ciudades son aproximadas (centros urbanos).",
+            "ciudades son aproximadas (centros urbanos). Los tiempos de viaje "
+            "y las rutas los calcula el servidor público de demostración de "
+            f"OSRM sobre la red vial de OpenStreetMap. {TRAVEL_ATTRIBUTION}.",
         ),
     )

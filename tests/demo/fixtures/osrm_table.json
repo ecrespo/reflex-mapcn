@@ -1,0 +1,12 @@
+{
+  "code": "Ok",
+  "durations": [[0, 7200.5, 19800.2, null]],
+  "distances": [[0, 154000.0, 412300.5, null]],
+  "sources": [{"location": [-66.9036, 10.4806], "name": "Caracas"}],
+  "destinations": [
+    {"location": [-66.9036, 10.4806], "name": "Caracas"},
+    {"location": [-68.0077, 10.162], "name": "Valencia"},
+    {"location": [-71.6125, 10.6427], "name": "Maracaibo"},
+    {"location": [-63.8861, 11.0333], "name": "La Asuncion"}
+  ]
+}

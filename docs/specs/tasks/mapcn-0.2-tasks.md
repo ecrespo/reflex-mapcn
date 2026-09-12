@@ -124,11 +124,16 @@
 - **Depende de:** T-016, T-009, T-008, T-012, T-015
 - **Done:** cada interruptor añade/quita su capa sin errores en consola; cambio de tema con todas activas no deja capas huérfanas (inspeccionar `map.getLayersOrder()` desde DevTools).
 
-### T-018 · OSRM + Tiempos de viaje en `/venezuela` `[P]` (respecto a T-016)
+### T-018 · OSRM + Tiempos de viaje en `/venezuela` `[P]` (respecto a T-016) — `[x] 2026-09-12`
 - **Qué:** `services/osrm.py` (`table` máx. 25 destinos, `route`, caché 1 h, `error`), tests con fixtures; en `VenezuelaState`: `load_travel_times` (background), `travel_rows` (ordenadas), `select_travel_row` ⇒ `map_route` + `fitBounds`; UI: botón "Tiempos de viaje" (habilitado con estado seleccionado), tabla lateral, "sin ruta" para nulos.
 - **REQ:** REQ-TVJ-001..004
 - **Archivos:** `services/osrm.py`, `pages/venezuela.py`, `tests/demo/test_osrm.py`
 - **Done:** pytest en verde; en la app, desde "Distrito Capital" aparecen 22 filas y al pulsar una se dibuja la ruta.
+- **Notas de revisión (2026-09-12):**
+  - `TravelRow` se implementa como dataclass y no como el `TypedDict` del Data Model §5.1: los campos son los de la spec, pero `rx.foreach` sobre una lista de dataclasses es el patrón que ya usa `/routes`. No se abre Delta porque el contrato de campos no cambia.
+  - La clave de caché de la matriz añade un digest de los destinos al par `(perfil, origen)` que documenta el Data Model §6, para que un segundo cálculo desde la misma capital hacia otra lista de destinos no lea tiempos ajenos. La clave sigue siendo interna y el TTL de 1 h de REQ-TVJ-004 no cambia.
+  - Un estado insular puede ser origen: la matriz vuelve llena de huecos y cada fila dice "sin ruta" (REQ-TVJ-002), en vez de ocultar el panel.
+  - Verificado contra el servidor real de OSRM el 2026-09-12: 22 filas desde Caracas, sin error, y ruta de 577 puntos a La Guaira. Falta solo la comprobación visual en el navegador, que entra en T-020.
 
 ### T-019 · Docs de la demo y compile_check global
 - **Qué:** README de la demo (páginas, fuentes de datos, licencias), `.env.example` (variables opcionales: `TOMTOM_API_KEY`, `OPENWEATHER_API_KEY` para recetas), `compile_check` de todas las páginas.
@@ -226,6 +231,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-12 | T-018 | OK | TDD: 17 tests del cliente OSRM y 22 de la página, escritos antes del código, con dos respuestas reales guardadas como fixtures y sin red. Dos decisiones de implementación: `TravelRow` es un dataclass y no un `TypedDict`, porque `rx.foreach` sobre una lista de dataclasses es el patrón que ya usa `/routes` y el Data Model solo fija los campos; y la clave de caché de la matriz añade un digest de los destinos al `(perfil, origen)` de la spec, para que un segundo cálculo desde la misma capital hacia otra lista no lea tiempos ajenos. Un estado insular sí puede ser origen: la matriz vuelve llena de huecos y cada fila dice "sin ruta", que es justo lo que pide REQ-TVJ-002. Mutación de tres puntos (columna del origen, tamaño del lote, orden de las filas) para comprobar que los tests discriminan: los tres fallaron. 155 tests Python en verde; ruff y compileall también. Falta el benchmark de red real, que se verá en T-020. |
 | 2026-09-11 | Delta 2026-09-heatmap-filter, T-017 | OK | El Delta del filtro en el mapa de calor se aprobó (opción A), se implementó y se plegó a PRD (REQ-HEA-007) y API Spec §3.3. Después T-017: los cuatro interruptores. En vivo con bucle de 60 s y capa de anillo estático para las últimas 24 h (sin animación por estado, DD-009). Densidad con peso por magnitud y desvanecido en zoom 8, ya filtrada. Fallas desde el asset con color por tipo de desplazamiento y tooltip en hover. Relieve con el preset de AWS y sombreado. 6 tests nuevos; 116 tests Python y 57 JSX en verde; las 11 páginas renderizan. |
 | 2026-09-11 | T-016 | OK | TDD: 14 tests sobre funciones puras, porque un estado de Reflex no se puede instanciar fuera de la app; la lógica vive en funciones de módulo y el estado solo delega. Dos fallos reales encontrados por los tests: faltaba el manejador del interruptor de notables (Reflex ya no genera `set_*` implícitos) y el selector de profundidad devolvía la etiqueta en español en vez de la clave, con lo que la cláusula de profundidad nunca habría casado. Se añadió la nota de cobertura del catálogo (hallazgo A-12 del Analyze). Las 11 páginas de la demo renderizan sin error. 109 tests Python en verde. |
 | 2026-09-11 | T-015 | OK | TDD: 13 tests, primero las funciones puras con geometría sintética. La primera versión filtraba fallas pero no recortaba geometrías, y el test del asset lo detectó: una falla llegaba a 19,7° N. Se añadió `clip_line`, que parte la línea en tramos dentro de la caja y conserva el vértice de cruce para que la línea llegue al borde. Descargado el catálogo GEM (10,6 MB) y generado `mapcn_demo/assets/venezuela_fallas.geojson`: 255 fallas, 86 KB, muy por debajo del presupuesto de 300 KB. Atribución CC BY-SA 4.0 y colores por tipo de desplazamiento en `venezuela_data.py`. 95 tests Python y 56 JSX en verde. |

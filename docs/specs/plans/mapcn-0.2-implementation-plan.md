@@ -87,7 +87,7 @@ Cuatro fases incrementales, cada una deployable (el paquete sigue instalable y l
 | F3-02 | `scripts/build_faults.py` + generar `assets/venezuela_fallas.geojson` + atribución | 0.5d | — | ✔ 2026-09-11 |
 | F3-03 | Página `/sismos`: estado, capa circle, filtros, slider temporal y ▶, popup, leyenda, notables | 1d | F2-06, F3-01 | ✔ 2026-09-11 |
 | F3-04 | En vivo (bg loop 60 s + capa recientes), Densidad (heatmap), Fallas (map_layer), Relieve (terrain) | 0.5d | F3-03, F2-05, F2-04, F2-08, F3-02 | ✔ 2026-09-11 |
-| F3-05 | `services/osrm.py` (table + route, caché) + tests; UI "Tiempos de viaje" en `/venezuela` con tabla y ruta | 0.75d | — | ☐ |
+| F3-05 | `services/osrm.py` (table + route, caché) + tests; UI "Tiempos de viaje" en `/venezuela` con tabla y ruta | 0.75d | — | ✔ 2026-09-12 |
 | F3-06 | Nav y README de la demo; `compile_check` de todas las páginas | 0.25d | F3-03..05 | ☐ |
 
 **Done:** `reflex run` muestra `/sismos` con ≥ 1 000 sismos históricos y el feed en vivo; tabla de tiempos desde Caracas con 22 filas; compile_check OK.

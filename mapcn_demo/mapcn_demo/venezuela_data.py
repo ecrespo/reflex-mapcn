@@ -198,6 +198,40 @@ CITIES: list[City] = [
     City("Carúpano", "Sucre", "ciudad", -63.2583, 10.6667),
 ]
 
+
+@dataclasses.dataclass(frozen=True)
+class Capital:
+    """The seat of a state, as a place a car can be routed to."""
+
+    state: str
+    name: str
+    lng: float
+    lat: float
+
+
+# No road reaches these, so they are never a driving destination. Their own
+# capitals may still be an origin: the answer is then a column of holes.
+INSULAR_STATES = frozenset({"Dependencias Federales", "Isla de Aves", "Nueva Esparta"})
+
+
+def _build_capitals() -> dict[str, Capital]:
+    """Pair every state with the marker that already carries its capital."""
+    cities = {(city.name, city.state): city for city in CITIES}
+    capitals: dict[str, Capital] = {}
+    for state in STATE_NAMES:
+        name = STATE_INFO[state]["capital"]
+        city = cities.get((name, state))
+        if city is not None:
+            capitals[state] = Capital(state, name, city.lng, city.lat)
+    return capitals
+
+
+CAPITALS: dict[str, Capital] = _build_capitals()
+
+CONTINENTAL_CAPITALS: list[Capital] = [
+    capital for state, capital in CAPITALS.items() if state not in INSULAR_STATES
+]
+
 # Basemap styles with street-level detail (OpenStreetMap data via OpenFreeMap).
 VENEZUELA_STYLES = {
     "OpenFreeMap Liberty (calles, POIs)": "https://tiles.openfreemap.org/styles/liberty",
