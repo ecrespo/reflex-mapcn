@@ -195,11 +195,17 @@
   - El CHANGELOG separa lo que ve quien instala el paquete (`Added`, `Fixed`) de lo que solo afecta al repositorio (`Infrastructure`), que es donde va el trabajo de CI y de specs que estaba en `Unreleased`.
   - Queda abierto H-02 de T-020 (documentar `uv run --extra dev reflex run`), que no bloquea la publicación.
 
-### T-022 · Release 0.2.0
+### T-022 · Release 0.2.0 — `[x] 2026-09-12`
 - **Qué:** `python scripts/bump_version.py . minor` (skill), `uv run reflex component build`, verificar wheel (jsx/css/pyi/presets/helpers), `uv publish` (con confirmación humana), tag `v0.2.0`, `reflex component share` con captura de `/sismos`.
 - **REQ:** Art. 7
 - **Depende de:** T-021
-- **Done:** `pip install reflex-mapcn==0.2.0` en venv limpio importa `reflex_mapcn.map_terrain`.
+- **Done:** `pip install reflex-mapcn==0.2.0` en venv limpio importa `reflex_mapcn.map_terrain`. ✔ verificado el 2026-09-12 contra PyPI.
+- **Notas de revisión (2026-09-12):**
+  - La tarea decía `uv publish` a mano, pero desde que existe `release.yml` la publicación la dispara la etiqueta con trusted publishing, y hacer ambas cosas fallaría porque PyPI no admite resubir una versión. Se siguió la vía de la etiqueta.
+  - El script de bump del skill solo reescribe `pyproject.toml` y dejaba `__version__` desfasado. Se añadió `tests/test_packaging.py`, que falla si los dos números no coinciden.
+  - `reflex component build` no se pudo usar: recorre todos los directorios del proyecto y un `.venv` vacío dentro de `mapcn_demo` le hace salir del repositorio. Los stubs se regeneraron invocando `PyiGenerator().scan_all([Path("custom_components")])`, que es lo que hace ese comando para el paquete; salieron idénticos a los commiteados.
+  - Tres fallos de CI corregidos antes de publicar, ninguno en el paquete: la deriva de `ruff format` en cuatro archivos, que venía de T-005; bandit señalando SHA-1 en la clave de caché de OSRM, ahora blake2s; y siete alertas de CodeQL, tres altas por comparar hosts como subcadena en tests, reescritas para comparar lo que de verdad importa.
+  - Pendiente y opcional: `reflex component share` para la galería de Reflex, que es un envío a un tercero y no se hizo sin pedirlo.
 
 ## Matriz de trazabilidad
 
@@ -271,6 +277,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-12 | T-022 | OK | 0.2.0 publicada. PR #6 a main con 25 comprobaciones en verde tras corregir formato, bandit y CodeQL. Etiqueta `v0.2.0` sobre el commit de merge; `release.yml` verificó versión, rama y ausencia previa en PyPI, y publicó con trusted publishing. Verificado después: PyPI sirve 0.2.0 con `requires-python >=3.10`, la release de GitHub lleva la rueda y el sdist, y un entorno limpio instala desde PyPI e importa `map_terrain`. |
 | 2026-09-12 | T-021 | OK | Specs marcadas como implementadas en 0.2.0 y sección `## [0.2.0]` del CHANGELOG escrita desde los commits del ciclo, con los dos Delta ya plegados. Enlaces de comparación actualizados. |
 | 2026-09-12 | Delta 2026-09-catalog-payload (D-003, D-004) | OK | Aprobada la opción 1 de las tres medidas en H-03. TDD: seis tests en rojo primero (mínimo por defecto, propiedades retiradas, `recent` solo en el vivo, presupuesto por evento) y dos más para la ficha del USGS reconstruida desde el id, con mutación para comprobar que discriminan. El histórico pasa de 3 555 eventos y 1 089 KB a 1 621 y 335,4 KB medidos en el websocket, dentro del presupuesto de 400 KB. Plegado al API Spec §5.1, al Data Model §3.2 y §6, y nota de compresión en el Tech Design. 203 tests Python en verde. |
 | 2026-09-12 | T-020 | OK con un fallo | Checklist ejecutado sobre la app real con Playwright, no a ojo: 24 cargas de página sin errores, tema y estilos sin capas huérfanas, lienzo transparente con etiquetas, 60 fps con 10 000 puntos y filtro en 63–103 ms. El presupuesto del histórico no se cumple: 1 089 KB frente a 400, medido en el fotograma del websocket, que además no negocia compresión. Queda como H-03 con las cinco opciones medidas y una recomendación. Durante la revisión apareció un fallo propio en la página nueva: el interruptor de basemap transparente no hacía nada porque el mapa fijaba `styles`, que tiene precedencia sobre `blank`; corregido con test. |
