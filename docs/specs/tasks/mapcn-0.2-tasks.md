@@ -153,6 +153,9 @@
 - **REQ:** REQ-*-008/009, REQ-PNT-004/007, RNF rendimiento
 - **Depende de:** T-019
 - **Done:** checklist rellenado en el registro de ejecución con resultados y capturas.
+- **Hallazgos de la revisión (en curso):**
+  - **H-01 (2026-09-12, corregido):** `/sismos` no mostraba el mapa. El contenedor medía 0 px de alto, sin errores en consola. Causa: `mapcn.css` fijaba `height: 100%` en `.mapcn-map`, misma especificidad que la clase en la que Reflex compila un `height=`, y ganaba la hoja del paquete; la página es la única que da el alto al mapa en vez de a un contenedor padre. El defecto venía de 0.1.0 y solo se ve cuando el padre no tiene alto propio. Arreglado moviendo el tamaño por defecto a una regla `:where(.mapcn-map)`, que no pesa nada, con dos tests nuevos en Chromium (`tests/js/tests/map_size.test.mjs`) que miden el alto computado con la regla del autor insertada antes que la del paquete. Verificado en la app: 3555 sismos dibujados.
+  - **H-02 (2026-09-12, pendiente de decisión):** `uv run reflex run` sincroniza el entorno sin el extra `dev` y deja el `.venv` sin pytest ni ruff. Conviene documentar `uv run --extra dev reflex run`, o arrancar la demo desde su propio entorno.
 
 ### T-021 · Plegar specs y CHANGELOG 0.2.0
 - **Qué:** marcar PRD/API/Tech/Data/Plan como `APPROVED` + nota `IMPLEMENTED 0.2.0`; anotar desviaciones como Delta si las hubo; CHANGELOG `## [0.2.0]`.

@@ -24,11 +24,18 @@
   --mapcn-loader-bg: rgba(255, 255, 255, 0.5);
 
   position: relative;
-  height: 100%;
-  width: 100%;
   min-height: 0;
   color: var(--mapcn-fg);
   font-family: var(--default-font-family, inherit);
+}
+
+/* Filling the parent is a default, not a decision. A height passed to the
+ * component compiles to a class of this same specificity, so the rule that
+ * carries it has to be able to win wherever it lands in the cascade, and
+ * `:where()` weighs nothing. */
+:where(.mapcn-map) {
+  height: 100%;
+  width: 100%;
 }
 
 .dark .mapcn-map,

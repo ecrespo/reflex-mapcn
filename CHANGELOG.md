@@ -7,6 +7,14 @@ article 7 of `docs/specs/constitution.md`.
 
 ## [Unreleased]
 
+### Fixed
+
+- A height or width given to `map` itself is no longer ignored. The stylesheet
+  set the size on `.mapcn-map`, which has the same weight as the class Reflex
+  compiles a `height=` prop into, so the default won and the map collapsed to
+  nothing whenever its parent had no height of its own. The default now sits in
+  a `:where()` rule, which weighs nothing.
+
 ### Added
 
 - Continuous integration on every push and pull request to `develop` and `main`:

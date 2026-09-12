@@ -25,6 +25,21 @@ page.on("console", (message) => {
 page.on("pageerror", (error) => consoleErrors.push(String(error)));
 
 await page.setContent("<!doctype html><html><body></body></html>");
+
+// The bundler empties every stylesheet import, so the package CSS is handed
+// to the page as text instead: a test that measures layout inserts it itself,
+// in the order it wants to prove something about.
+const packageCss = await readFile(
+  resolve(here, "..", "..", "..", "custom_components", "reflex_mapcn", "mapcn.css"),
+  "utf8",
+);
+await page.addInitScript((css) => {
+  window.__MAPCN_CSS__ = css;
+}, packageCss);
+await page.evaluate((css) => {
+  window.__MAPCN_CSS__ = css;
+}, packageCss);
+
 await page.addScriptTag({ content: bundle, type: "module" });
 
 let results;
