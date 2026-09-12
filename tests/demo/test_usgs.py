@@ -196,9 +196,7 @@ def test_REQ_SIS_007_the_live_feed_asks_for_the_last_thirty_days():
 def test_REQ_SIS_007_recent_events_are_flagged():
     now_ms = 1690000000000
     catalog = asyncio.run(usgs.fetch_live(now_ms=now_ms))
-    by_id = {
-        f["properties"]["id"]: f for f in catalog["features"]["features"]
-    }
+    by_id = {f["properties"]["id"]: f for f in catalog["features"]["features"]}
 
     # 1689999000000 is 17 minutes before `now`; the rest are years old.
     assert by_id["us7000abcd"]["properties"]["recent"] is True

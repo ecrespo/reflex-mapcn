@@ -225,7 +225,8 @@ def test_REQ_RAS_006_the_rainviewer_preset_demands_tiles_from_the_helper():
         mapcn.map_raster_layer(preset="rainviewer")
 
     layer = mapcn.map_raster_layer(
-        preset="rainviewer", tiles=["https://tilecache.rainviewer.com/v2/{z}/{x}/{y}.png"]
+        preset="rainviewer",
+        tiles=["https://tilecache.rainviewer.com/v2/{z}/{x}/{y}.png"],
     )
     assert _prop(layer, "max_zoom") == "7"
 

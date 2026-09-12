@@ -198,8 +198,7 @@ def test_REQ_RAS_006_rainviewer_tiles_builds_the_tile_template():
     tiles = helpers.rainviewer_tiles(frame, "https://tilecache.rainviewer.com")
 
     assert tiles == [
-        "https://tilecache.rainviewer.com/v2/radar/1689999000"
-        "/256/{z}/{x}/{y}/2/1_1.png"
+        "https://tilecache.rainviewer.com/v2/radar/1689999000/256/{z}/{x}/{y}/2/1_1.png"
     ]
 
 

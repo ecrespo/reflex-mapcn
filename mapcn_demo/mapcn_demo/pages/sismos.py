@@ -96,9 +96,7 @@ def time_cutoff_ms(year: int, month: int) -> int:
     """
     month = min(max(int(month), 1), 12)
     last_day = calendar.monthrange(int(year), month)[1]
-    end = datetime(
-        int(year), month, last_day, 23, 59, 59, 999_000, tzinfo=timezone.utc
-    )
+    end = datetime(int(year), month, last_day, 23, 59, 59, 999_000, tzinfo=timezone.utc)
     return int(end.timestamp() * 1000)
 
 
@@ -382,8 +380,8 @@ def _legend() -> rx.Component:
         *[
             rx.hstack(
                 rx.box(
-                width="10px", height="10px", border_radius="50%", background=color
-            ),
+                    width="10px", height="10px", border_radius="50%", background=color
+                ),
                 rx.text(label, size="1"),
                 spacing="2",
                 align="center",

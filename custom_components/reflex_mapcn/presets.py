@@ -91,9 +91,7 @@ RASTER_PRESETS: dict[str, RasterPreset] = {
         ),
         tile_size=256,
         max_zoom=19,
-        attribution=(
-            "© OpenRailwayMap contributors, CC BY-SA 2.0 · © OpenStreetMap"
-        ),
+        attribution=("© OpenRailwayMap contributors, CC BY-SA 2.0 · © OpenStreetMap"),
         license="CC BY-SA 2.0",
     ),
     "openseamap": RasterPreset(
@@ -135,7 +133,9 @@ RASTER_PRESETS: dict[str, RasterPreset] = {
 TERRAIN_PRESETS: dict[str, TerrainPreset] = {
     "aws_terrarium": TerrainPreset(
         name="aws_terrarium",
-        tiles=("https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",),
+        tiles=(
+            "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+        ),
         encoding="terrarium",
         tile_size=256,
         max_zoom=15,

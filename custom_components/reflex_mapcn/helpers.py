@@ -57,6 +57,7 @@ class RainViewerFrames(TypedDict):
     past: list[RainViewerFrame]
     nowcast: list[RainViewerFrame]
 
+
 Stop = tuple[float, Any]
 
 
