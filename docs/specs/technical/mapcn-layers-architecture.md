@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo / Claude |
-| **Estado** | `APPROVED` — aprobado 2026-09-11 (checkpoint 3) |
+| **Estado** | `APPROVED` — aprobado 2026-09-11 (checkpoint 3) · `IMPLEMENTED 0.2.0` — 2026-09-12 |
 | **Versión** | 1.0 |
 | **Fecha** | 2026-09-11 |
 | **PRD** | `docs/specs/prd/mapcn-layers-0.2.md` |

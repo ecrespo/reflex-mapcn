@@ -5,7 +5,7 @@
 | Campo | Valor |
 |---|---|
 | **Autor** | Ernesto Crespo (redacción asistida por Claude) |
-| **Estado** | `APPROVED` — aprobado 2026-09-11 (checkpoint 1) |
+| **Estado** | `APPROVED` — aprobado 2026-09-11 (checkpoint 1) · `IMPLEMENTED 0.2.0` — 2026-09-12 |
 | **Versión** | 1.1 |
 | **Fecha** | 2026-09-11 |
 | **Reviewers** | Ernesto Crespo |

@@ -184,11 +184,16 @@
   - **H-03 (2026-09-12, CERRADO por el Delta `2026-09-catalog-payload`, opción 1):** el catálogo histórico pesa 1 089 KB al cruzar el websocket, contra el presupuesto de 400 KB del Tech Design §1 y del Data Model §6. El transporte no negocia compresión (`sec-websocket-extensions: none`), así que viaja en claro; comprimido serían 131 KB. El reparto medido sobre 3 555 eventos: `url` 236 KB, geometría 162, `place` 151, `time` 68, `id` duplicado en la feature y en las propiedades 59+59, `magType` 49, `recent` 49 (siempre `false` en el histórico), `depth` 43, `mag` 31. Opciones medidas: quitar `url` deja 859 KB; quitar además el id duplicado y `recent`, 744 KB; quitar también `place`, 590 KB; subir el mínimo por defecto a M ≥ 4,5 (1 621 eventos) deja 501 KB con el esquema actual, y ~340 KB combinado con el recorte. Resuelto: Delta que sube el mínimo a 4,5 —coherente con la nota de cobertura que ya muestra la página— y retire `url` (reconstruible desde `id`), el id duplicado y `recent` del histórico. Afectaba al Data Model §3 y al API Spec §5.1, plegados el 2026-09-12. Resultado medido en la app: 1 621 eventos y **335,4 KB** en el fotograma del websocket, dentro del presupuesto.
   - **H-02 (2026-09-12, pendiente de decisión):** `uv run reflex run` sincroniza el entorno sin el extra `dev` y deja el `.venv` sin pytest ni ruff. Conviene documentar `uv run --extra dev reflex run`, o arrancar la demo desde su propio entorno.
 
-### T-021 · Plegar specs y CHANGELOG 0.2.0
+### T-021 · Plegar specs y CHANGELOG 0.2.0 — `[x] 2026-09-12`
 - **Qué:** marcar PRD/API/Tech/Data/Plan como `APPROVED` + nota `IMPLEMENTED 0.2.0`; anotar desviaciones como Delta si las hubo; CHANGELOG `## [0.2.0]`.
 - **REQ:** Art. 8
 - **Depende de:** T-020
 - **Done:** `git diff docs/` muestra estados actualizados; sin TODOs abiertos en Tasks.
+- **Notas de revisión (2026-09-12):**
+  - Los cinco artefactos (PRD, API, Tech, Data, Plan) quedan `APPROVED` + `IMPLEMENTED 0.2.0`.
+  - Dos Delta aprobados e implementados en el ciclo: `2026-09-heatmap-filter` y `2026-09-catalog-payload`. Ambos plegados a sus specs; `docs/changes/README.md` los lista.
+  - El CHANGELOG separa lo que ve quien instala el paquete (`Added`, `Fixed`) de lo que solo afecta al repositorio (`Infrastructure`), que es donde va el trabajo de CI y de specs que estaba en `Unreleased`.
+  - Queda abierto H-02 de T-020 (documentar `uv run --extra dev reflex run`), que no bloquea la publicación.
 
 ### T-022 · Release 0.2.0
 - **Qué:** `python scripts/bump_version.py . minor` (skill), `uv run reflex component build`, verificar wheel (jsx/css/pyi/presets/helpers), `uv publish` (con confirmación humana), tag `v0.2.0`, `reflex component share` con captura de `/sismos`.
@@ -266,6 +271,7 @@ SHOULD/COULD sin tarea propia: ninguno (todos asignados; los COULD pueden diferi
 
 | Fecha | Tareas | Resultado | Notas |
 |---|---|---|---|
+| 2026-09-12 | T-021 | OK | Specs marcadas como implementadas en 0.2.0 y sección `## [0.2.0]` del CHANGELOG escrita desde los commits del ciclo, con los dos Delta ya plegados. Enlaces de comparación actualizados. |
 | 2026-09-12 | Delta 2026-09-catalog-payload (D-003, D-004) | OK | Aprobada la opción 1 de las tres medidas en H-03. TDD: seis tests en rojo primero (mínimo por defecto, propiedades retiradas, `recent` solo en el vivo, presupuesto por evento) y dos más para la ficha del USGS reconstruida desde el id, con mutación para comprobar que discriminan. El histórico pasa de 3 555 eventos y 1 089 KB a 1 621 y 335,4 KB medidos en el websocket, dentro del presupuesto de 400 KB. Plegado al API Spec §5.1, al Data Model §3.2 y §6, y nota de compresión en el Tech Design. 203 tests Python en verde. |
 | 2026-09-12 | T-020 | OK con un fallo | Checklist ejecutado sobre la app real con Playwright, no a ojo: 24 cargas de página sin errores, tema y estilos sin capas huérfanas, lienzo transparente con etiquetas, 60 fps con 10 000 puntos y filtro en 63–103 ms. El presupuesto del histórico no se cumple: 1 089 KB frente a 400, medido en el fotograma del websocket, que además no negocia compresión. Queda como H-03 con las cinco opciones medidas y una recomendación. Durante la revisión apareció un fallo propio en la página nueva: el interruptor de basemap transparente no hacía nada porque el mapa fijaba `styles`, que tiene precedencia sobre `blank`; corregido con test. |
 | 2026-09-12 | T-023 | OK | TDD: 26 tests escritos antes del código (lector de `.env`, registro de fuentes, plantillas con clave, radar, datos de símbolos, vistas por fuente). El test de documentación de T-019 hizo su trabajo solo: falló en cuanto la página entró en el menú y el README no la nombraba. Dos hallazgos medidos durante la verificación en el navegador, no supuestos: TomTom no tiene datos sobre Venezuela y el estilo `relative0` no pinta casi nada fuera de hora punta. La demo ya ejercita los seis componentes de 0.2. 196 tests Python, 59 JSX, `COMPILE OK: 12 pages`. |
