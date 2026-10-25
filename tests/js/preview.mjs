@@ -9,7 +9,6 @@ await page.waitForTimeout(20000);   // the catalogue lands, defaults: circles + 
 await page.locator(".mapcn-map").first().screenshot({ path: `${out}/preview-map.png` });
 
 // The panel, the map and the legend together: the component being driven.
-const section = page.locator("div").filter({ has: page.locator(".mapcn-map") }).last();
 const box = await page.locator(".mapcn-map").first().boundingBox();
 await page.screenshot({
   path: `${out}/preview-panel.png`,
