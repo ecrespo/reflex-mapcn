@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import calendar
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 import reflex as rx
@@ -84,7 +84,7 @@ def depth_band_from_label(label: str) -> str:
 
 
 def current_year() -> int:
-    return datetime.now(tz=timezone.utc).year
+    return datetime.now(tz=UTC).year
 
 
 def time_cutoff_ms(year: int, month: int) -> int:
@@ -95,7 +95,7 @@ def time_cutoff_ms(year: int, month: int) -> int:
     """
     month = min(max(int(month), 1), 12)
     last_day = calendar.monthrange(int(year), month)[1]
-    end = datetime(int(year), month, last_day, 23, 59, 59, 999_000, tzinfo=timezone.utc)
+    end = datetime(int(year), month, last_day, 23, 59, 59, 999_000, tzinfo=UTC)
     return int(end.timestamp() * 1000)
 
 
@@ -136,7 +136,7 @@ def format_event_times(time_ms: int) -> dict[str, str]:
     """The same instant in UTC and in Venezuelan time."""
     if not time_ms:
         return {"utc": "—", "caracas": "—"}
-    moment = datetime.fromtimestamp(int(time_ms) / 1000, tz=timezone.utc)
+    moment = datetime.fromtimestamp(int(time_ms) / 1000, tz=UTC)
     return {
         "utc": moment.strftime("%Y-%m-%d %H:%M UTC"),
         "caracas": moment.astimezone(CARACAS).strftime("%Y-%m-%d %H:%M Caracas"),

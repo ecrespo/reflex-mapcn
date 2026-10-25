@@ -1,6 +1,6 @@
 # Constitución — reflex-mapcn
 
-> Versión 1.0 · Ratificada: 2026-09-11 · Última enmienda: —
+> Versión 1.1 · Ratificada: 2026-09-11 · Última enmienda: 2026-10-24 (Art. 7, restricciones del stack)
 > Ámbito: repositorio `reflex-mapcn` (paquete `custom_components/reflex_mapcn`, app `mapcn_demo`, `tests/`, `docs/`)
 > Nivel de rigor SDD: **spec-anchored** — las specs viven en `docs/specs/`, se versionan con el código y los cambios a features ya publicadas entran como Delta Specs en `docs/changes/`.
 
@@ -31,7 +31,7 @@ EL SISTEMA DEBERÁ cubrir todo requisito MUST (`REQ-*`) con al menos un test en 
 *Racional: la verificación del JSX solo es posible en navegador; sin tests con REQ en el nombre la trazabilidad se pierde al segundo release.*
 
 ### Art. 7 — Compatibilidad y versionado
-EL SISTEMA DEBERÁ mantener `reflex>=0.8.1` como mínimo soportado, DEBERÁ versionar el paquete con SemVer (cambio de firma pública de un componente ya publicado ⇒ major o Delta Spec con periodo de deprecación de una minor), y DEBERÁ acompañar cada release con entrada en `CHANGELOG.md` y actualización de `README.md`.
+EL SISTEMA DEBERÁ mantener `reflex>=0.10.0` como mínimo soportado, DEBERÁ versionar el paquete con SemVer (cambio de firma pública de un componente ya publicado ⇒ major o Delta Spec con periodo de deprecación de una minor), y DEBERÁ acompañar cada release con entrada en `CHANGELOG.md` y actualización de `README.md`.
 *Racional: el paquete está en PyPI; los usuarios fijan versiones y esperan que una minor no rompa.*
 
 ### Art. 8 — Proceso
@@ -46,10 +46,10 @@ EL EQUIPO DEBERÁ escribir código, docstrings, comentarios, README, CHANGELOG y
 
 | Área | Decisión |
 |---|---|
-| Lenguaje backend | Python ≥ 3.10 (soporte 3.10–3.13) |
-| Framework | Reflex ≥ 0.8.1 (probado con 0.9.x); `NoSSRComponent`, `rx.asset(shared=True)` |
+| Lenguaje backend | Python ≥ 3.11 (soporte 3.11–3.13; Reflex 0.10 exige ≥ 3.11) |
+| Framework | Reflex ≥ 0.10.0 (probado con 0.10.0); `NoSSRComponent`, `rx.asset(shared=True)` |
 | Frontend | React 19 (provisto por Reflex), `maplibre-gl@^6.3.0`, JSX sin TypeScript, CSS plano con variables Radix |
-| Empaquetado | setuptools, `custom_components/` layout, `uv` para entorno/build/publish, `reflex component build` para `.pyi` |
+| Empaquetado | setuptools, `custom_components/` layout, `uv` para entorno/build/publish, `python -m reflex_base.utils.pyi_generator` para `.pyi` (Reflex 0.10 retiró `reflex component`) |
 | Calidad | ruff (E, F, I, B, UP), `compile_check` de la demo, tests Python + smoke test JSX en Chromium (Playwright) |
 | Datos geoespaciales | GeoJSON RFC 7946 (lng, lat[, elev]); coordenadas `[longitude, latitude]` siempre en ese orden; fechas ISO-8601 UTC; epochs en milisegundos (convención USGS) |
 | Servicios externos permitidos sin key | USGS FDSN/feeds, OSRM demo server, OpenFreeMap, CARTO basemaps, RainViewer, OpenRailwayMap, OpenSeaMap, Esri World Imagery, AWS Terrain Tiles, GEM faults (archivo estático) |
@@ -59,7 +59,7 @@ EL EQUIPO DEBERÁ escribir código, docstrings, comentarios, README, CHANGELOG y
 
 | Fecha | Artículo | Cambio | Razón | Aprobado por |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| 2026-10-24 | Art. 7 y Restricciones del stack | Mínimo `reflex>=0.10.0`, Python ≥ 3.11, stubs con `reflex_base.utils.pyi_generator` | Reflex 0.10 exige Python ≥ 3.11 y eliminó `reflex component build`; ver `docs/changes/2026-10-reflex-0.10/` | Ernesto Crespo |
 
 ## Constitution check (usar en cada artefacto)
 

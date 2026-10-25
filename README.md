@@ -33,6 +33,8 @@ component, so you can build interactive maps in pure Python.
 pip install reflex-mapcn
 ```
 
+Requires Python 3.11 or newer and Reflex 0.10 or newer.
+
 The only npm dependency (`maplibre-gl`) is installed automatically by Reflex
 the first time the app compiles.
 
@@ -415,7 +417,8 @@ under which licence.
 uv sync --extra dev
 uv run pytest tests
 uv run ruff check . && uv run ruff format --check .
-PYTHONPATH="$PWD" uv run reflex component build   # regenerates .pyi stubs, builds dist/
+PYTHONPATH="$PWD" uv run python -m reflex_base.utils.pyi_generator custom_components/reflex_mapcn   # regenerates .pyi stubs
+uv build                                         # builds dist/
 ```
 
 The generated `custom_components/reflex_mapcn/mapcn.pyi` is committed. CI fails
@@ -429,7 +432,7 @@ Specifications live under `docs/`; read `docs/specs/constitution.md` first.
 ### Checks that run on every push and pull request
 
 `ci.yml` gates `develop` and `main` with ruff, byte-compilation, the test suite
-on Python 3.10 through 3.13, and a package build that rejects stale stubs or
+on Python 3.11 through 3.13, and a package build that rejects stale stubs or
 invalid trove classifiers and then installs the wheel in a clean environment.
 Alongside those it runs gitleaks over the full history, bandit, semgrep,
 pip-audit over the locked runtime dependencies, and a trivy filesystem scan.

@@ -65,7 +65,7 @@ def _importable(asset_path: Any) -> str:
     return f"$/public{raw}"
 
 
-# Inlined instead of ``_importable(_MAPCN_JS)``: `reflex component build`
+# Inlined instead of ``_importable(_MAPCN_JS)``: the Reflex stub generator
 # copies module-level assignments into ``mapcn.pyi`` verbatim but drops
 # private helpers, so a call here would leave an undefined name in the stub.
 MAPCN_LIBRARY: str = getattr(_MAPCN_JS, "importable_path", None) or (
