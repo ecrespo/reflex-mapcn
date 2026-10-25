@@ -50,7 +50,7 @@ jobs:
       fail-fast: false
       matrix:
         # Every version pyproject.toml claims to support.
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.1.0
@@ -78,16 +78,20 @@ jobs:
         # cannot see, so catch it here rather than at upload time.
         run: uv run --with trove-classifiers python scripts/check_metadata.py
 
-      - name: Build the package and regenerate type stubs
-        # The stub generator imports the component through its repository path.
+      - name: Regenerate type stubs
+        # Reflex 0.10 removed `reflex component build`; run its stub generator
+        # directly. It imports the component through its repository path.
         env:
           PYTHONPATH: ${{ github.workspace }}
-        run: uv run reflex component build
+        run: uv run python -m reflex_base.utils.pyi_generator custom_components/reflex_mapcn
+
+      - name: Build the package
+        run: uv build
 
       - name: Fail if the committed type stubs are stale
         run: |
           if ! git diff --exit-code -- custom_components/reflex_mapcn/mapcn.pyi; then
-            echo "::error file=custom_components/reflex_mapcn/mapcn.pyi::Committed stubs do not match the source. Regenerate them on the Python version in .python-version with: PYTHONPATH=\"\$PWD\" uv run reflex component build"
+            echo "::error file=custom_components/reflex_mapcn/mapcn.pyi::Committed stubs do not match the source. Regenerate them on the Python version in .python-version with: PYTHONPATH=\"\$PWD\" uv run python -m reflex_base.utils.pyi_generator custom_components/reflex_mapcn"
             exit 1
           fi
 

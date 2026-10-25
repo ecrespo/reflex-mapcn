@@ -7,6 +7,30 @@ article 7 of `docs/specs/constitution.md`.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-24
+
+Moves the package onto Reflex 0.10, the current release. No component, prop or
+event changes: applications that already run on Reflex 0.10 upgrade without
+touching their code.
+
+### Changed
+
+- The minimum Reflex version is now 0.10.0 (was 0.8.1), in the package and in
+  the demo's `requirements.txt`.
+- The minimum Python version is now 3.11 (was 3.10), because Reflex 0.10
+  requires it. The test matrix runs on 3.11, 3.12 and 3.13.
+- Reflex 0.10 removed `reflex component build`. The type stubs are now
+  regenerated with `python -m reflex_base.utils.pyi_generator
+  custom_components/reflex_mapcn` and the distributions are built with
+  `uv build`, in CI and in the documented development workflow.
+- The build backend requires `setuptools>=78.1.1`.
+- The constitution (article 7 and the stack table) records the new floor,
+  through the delta in `docs/changes/2026-10-reflex-0.10/`.
+
+### Removed
+
+- Support for Python 3.10.
+
 ## [0.2.0] - 2026-09-12
 
 Six new layer components, the presets and helpers they need, and a demo that
@@ -77,6 +101,7 @@ First public release.
   a Venezuela state map backed by a bundled GeoJSON.
 - Type stubs and a `py.typed` marker, so editors autocomplete every prop.
 
-[Unreleased]: https://github.com/ecrespo/reflex-mapcn/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ecrespo/reflex-mapcn/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ecrespo/reflex-mapcn/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ecrespo/reflex-mapcn/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ecrespo/reflex-mapcn/releases/tag/v0.1.0

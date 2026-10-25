@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import reflex as rx
 import reflex_mapcn as mapcn
@@ -188,7 +188,7 @@ def radar_tiles(frames: dict) -> tuple[list[str], str]:
         return [], "El radar de RainViewer no devolvió fotogramas."
     frame = past[-1]
     tiles = mapcn.rainviewer_tiles(frame, frames.get("host", ""))
-    moment = datetime.fromtimestamp(int(frame["time"]), tz=timezone.utc)
+    moment = datetime.fromtimestamp(int(frame["time"]), tz=UTC)
     return tiles, f"Fotograma de las {moment:%H:%M} UTC"
 
 

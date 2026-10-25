@@ -58,6 +58,15 @@ def test_the_readme_says_how_to_run_the_demo():
     assert "reflex run" in text
 
 
+def test_the_readme_runs_the_demo_without_pruning_the_dev_tools():
+    # `uv run` syncs the project environment first, and without the extra it
+    # removes pytest and ruff from it (T-020, H-02).
+    text = README.read_text()
+
+    assert "uv run --extra dev reflex run" in text
+    assert "--extra dev" in text.split("## Pages")[0], "explained where it runs"
+
+
 def test_the_package_readme_points_at_the_demo_readme():
     # The package README describes the demo in a paragraph; the detail, the
     # sources and the licences live in the demo's own file.

@@ -13,7 +13,7 @@ which cannot parse a date.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, TypedDict
 
 import httpx
@@ -52,11 +52,11 @@ class SeismicCatalog(TypedDict):
 
 
 def _now_ms() -> int:
-    return int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+    return int(datetime.now(tz=UTC).timestamp() * 1000)
 
 
 def _iso_now() -> str:
-    return datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(tz=UTC).isoformat(timespec="seconds")
 
 
 def _trim(
@@ -230,7 +230,7 @@ async def fetch_live(
     worldwide month feed is several megabytes, and this box is a few dozen
     kilobytes.
     """
-    reference = datetime.fromtimestamp((now_ms or _now_ms()) / 1000, tz=timezone.utc)
+    reference = datetime.fromtimestamp((now_ms or _now_ms()) / 1000, tz=UTC)
     start = (reference - timedelta(days=days)).date().isoformat()
     end = reference.date().isoformat()
 

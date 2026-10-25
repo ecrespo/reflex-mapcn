@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, TypedDict
 
 import httpx
@@ -58,7 +58,7 @@ class RouteResult(TypedDict):
 
 
 def _iso_now() -> str:
-    return datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(tz=UTC).isoformat(timespec="seconds")
 
 
 def _path(coordinates: list[Coordinate]) -> str:
