@@ -17,9 +17,15 @@
   citaban `reflex component build`, CHANGELOG 0.3.0.
 - **Done:** `git grep "component build"` solo aparece en registros históricos.
 
-### D-003 · Release 0.3.0 — `[ ] 2026-10-24`
+### D-003 · Release 0.3.0 — `[x] 2026-10-24`
 - **Qué:** versión 0.3.0 en `pyproject.toml` y `__version__`; PR `develop` →
   `main` con CI en verde; etiqueta `v0.3.0` sobre el merge; `release.yml`
   publica en PyPI con trusted publishing.
 - **Done:** `https://pypi.org/project/reflex-mapcn/0.3.0/` responde 200 y la
   release de GitHub tiene los artefactos.
+- **Registro:** PR #9 a `main` con todas las comprobaciones en verde tras
+  retirar una variable sin uso en `tests/js/preview.mjs` que CodeQL señaló.
+  Etiqueta `v0.3.0` sobre el commit de merge `0e2084d`; `release.yml` verificó
+  la etiqueta, repitió el CI completo, publicó en PyPI por trusted publishing y
+  adjuntó wheel y sdist a la release de GitHub. Un entorno limpio instala
+  `reflex-mapcn==0.3.0` desde PyPI junto con `reflex` 0.10.0.
